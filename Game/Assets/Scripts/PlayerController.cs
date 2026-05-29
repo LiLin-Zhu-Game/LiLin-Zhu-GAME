@@ -24,6 +24,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float purgeKnockback = 9f;
 
     private Rigidbody2D body;
+    private SpriteRenderer spriteRenderer;
     private WeaponController weapon;
     private GameDirector director;
     private Camera mainCamera;
@@ -65,9 +66,10 @@ public class PlayerController : MonoBehaviour
         body.gravityScale = 0f;
         body.freezeRotation = true;
         body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+        spriteRenderer = GetComponent<SpriteRenderer>();
 
         CircleCollider2D circle = GetComponent<CircleCollider2D>();
-        circle.radius = 0.42f;
+        circle.radius = 0.28f;
     }
 
     private void Update()
@@ -198,8 +200,10 @@ public class PlayerController : MonoBehaviour
         if (toMouse.sqrMagnitude > 0.04f)
         {
             aimDirection = toMouse.normalized;
-            float angle = Mathf.Atan2(aimDirection.y, aimDirection.x) * Mathf.Rad2Deg;
-            transform.rotation = Quaternion.Euler(0f, 0f, angle);
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.flipX = aimDirection.x < -0.05f;
+            }
         }
     }
 
@@ -266,7 +270,7 @@ public class PlayerController : MonoBehaviour
     private void CheckWeaponPickup()
     {
         nearbyWeapon = null;
-        float bestDistance = 1.45f;
+        float bestDistance = 2.25f;
         WeaponPickup[] pickups = FindObjectsOfType<WeaponPickup>();
         foreach (WeaponPickup pickup in pickups)
         {
