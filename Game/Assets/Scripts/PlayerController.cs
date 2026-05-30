@@ -48,6 +48,11 @@ public class PlayerController : MonoBehaviour
     public bool IsDead => dead;
     public string WeaponName => weapon != null ? weapon.CurrentWeaponName : "None";
 
+    public void SetBodyRenderer(SpriteRenderer bodyRenderer)
+    {
+        spriteRenderer = bodyRenderer;
+    }
+
     public void Initialize(GameDirector owner, WeaponController playerWeapon)
     {
         director = owner;

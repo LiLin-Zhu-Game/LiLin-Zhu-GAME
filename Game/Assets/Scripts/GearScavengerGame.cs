@@ -21,9 +21,18 @@ public class GearScavengerBootstrapper
 
 public class GameDirector : MonoBehaviour
 {
+    private struct RoomDefinition
+    {
+        public Vector2 Center;
+        public int Width;
+        public int Height;
+        public bool CombatRoom;
+    }
+
     private readonly List<EnemyController> activeEnemies = new List<EnemyController>();
     private readonly List<Vector2Int> floorCells = new List<Vector2Int>();
     private readonly HashSet<Vector2Int> walkable = new HashSet<Vector2Int>();
+    private readonly List<RoomDefinition> rooms = new List<RoomDefinition>();
 
     private ObjectPool playerBullets;
     private ObjectPool enemyBullets;
@@ -63,12 +72,11 @@ public class GameDirector : MonoBehaviour
         BuildLevel();
         BuildPools();
         SpawnPlayer();
-        hud = GameHud.Create(player);
+        hud = GameHud.Create(player, this);
         SpawnStarterWeaponDrops();
-        wave = 1;
-        ShowStatus("Wave 1: enemies are entering this room", 2.2f);
-        SpawnWave(wave);
-        ShowStatus($"Ready: {activeEnemies.Count} enemies and 3 weapons spawned nearby", 3.2f);
+        SpawnVisibleStarterEnemies();
+        SpawnGuaranteedRoomEnemies();
+        ShowStatus($"Ready: {activeEnemies.Count} enemies across all rooms, 3 weapons near player", 3.5f);
         StartCoroutine(WaveRoutine());
     }
 
@@ -89,6 +97,20 @@ public class GameDirector : MonoBehaviour
         {
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
+    }
+
+    private void OnGUI()
+    {
+        Color previous = GUI.color;
+        Rect panel = new Rect(12f, 12f, 390f, 108f);
+        GUI.color = new Color(0f, 0f, 0f, 0.72f);
+        GUI.DrawTexture(panel, Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        GUI.Label(new Rect(24f, 20f, 360f, 24f), "HUD / Debug: top-left game state");
+        GUI.Label(new Rect(24f, 44f, 360f, 24f), $"Enemies active: {activeEnemies.Count}");
+        GUI.Label(new Rect(24f, 68f, 360f, 24f), $"Weapon pickups: {ActiveWeaponPickupCount()}");
+        GUI.Label(new Rect(24f, 92f, 360f, 24f), "E = equip weapon    Mouse = aim/fire");
+        GUI.color = previous;
     }
 
     public Bullet GetPlayerBullet()
@@ -151,6 +173,53 @@ public class GameDirector : MonoBehaviour
         SpawnWeaponAtPlayerOffset(new Vector2(0f, 2.25f), 3);
     }
 
+    public void SpawnVisibleStarterEnemies()
+    {
+        SpawnEnemy(EnemyKind.Chaser, ToNearestFloorPoint((Vector2)player.transform.position + new Vector2(-3f, 1.6f)));
+        SpawnEnemy(EnemyKind.Chaser, ToNearestFloorPoint((Vector2)player.transform.position + new Vector2(3f, 1.6f)));
+        SpawnEnemy(EnemyKind.Drone, ToNearestFloorPoint((Vector2)player.transform.position + new Vector2(0f, 3.2f)));
+    }
+
+    public void SpawnGuaranteedRoomEnemies()
+    {
+        if (rooms.Count == 0)
+        {
+            // Hard fallback: if room data is unavailable, force visible spawns near the player.
+            SpawnEnemy(EnemyKind.Chaser, PickSpawnPoint(3.2f, 4.8f));
+            SpawnEnemy(EnemyKind.Chaser, PickSpawnPoint(3.2f, 4.8f));
+            SpawnEnemy(EnemyKind.Drone, PickSpawnPoint(3.8f, 5.8f));
+            return;
+        }
+
+        int combatRoomIndex = 0;
+        foreach (RoomDefinition room in rooms)
+        {
+            if (!room.CombatRoom)
+            {
+                continue;
+            }
+
+            combatRoomIndex++;
+            SpawnRoomEnemySet(room, combatRoomIndex >= 2);
+        }
+    }
+
+    private void SpawnRoomEnemySet(RoomDefinition room, bool includeSupport)
+    {
+        Vector2 center = room.Center;
+        float rx = Mathf.Max(1.6f, room.Width * 0.28f);
+        float ry = Mathf.Max(1.4f, room.Height * 0.24f);
+
+        SpawnEnemy(EnemyKind.Chaser, ToNearestFloorPoint(center + new Vector2(-rx, -ry)));
+        SpawnEnemy(EnemyKind.Chaser, ToNearestFloorPoint(center + new Vector2(rx, -ry)));
+        SpawnEnemy(EnemyKind.Drone, ToNearestFloorPoint(center + new Vector2(0f, ry)));
+
+        if (includeSupport)
+        {
+            SpawnEnemy(EnemyKind.Support, ToNearestFloorPoint(center + new Vector2(0f, -ry * 0.15f)));
+        }
+    }
+
     private void SpawnWeaponAtPlayerOffset(Vector2 offset, int weaponIndex)
     {
         WeaponPickup pickup = weaponPickups.Get().GetComponent<WeaponPickup>();
@@ -162,6 +231,21 @@ public class GameDirector : MonoBehaviour
     {
         hud?.SetMessage(message);
         statusTimer = seconds;
+    }
+
+    public int ActiveWeaponPickupCount()
+    {
+        int count = 0;
+        WeaponPickup[] allPickups = FindObjectsOfType<WeaponPickup>();
+        foreach (WeaponPickup pickup in allPickups)
+        {
+            if (pickup.gameObject.activeInHierarchy)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     public void FlashDamage()
@@ -186,17 +270,26 @@ public class GameDirector : MonoBehaviour
 
     private IEnumerator WaveRoutine()
     {
-        yield return null;
-
+        wave = 1;
+        yield return new WaitForSeconds(0.4f);
         while (activeEnemies.Count > 0 && !gameOver)
         {
             yield return null;
         }
 
-        for (wave = 2; wave <= 4; wave++)
+        for (wave = 2; wave <= 5; wave++)
         {
-            ShowStatus(wave < 4 ? $"Wave {wave}: hostile machines closing in" : "Boss wave: survive the breaker unit", 2.2f);
-            SpawnWave(wave);
+            bool isBossWave = wave == 5;
+            ShowStatus(isBossWave ? "Boss wave: survive the breaker unit" : $"Wave {wave}: rooms repopulated", 2.2f);
+            if (isBossWave)
+            {
+                SpawnBossWave();
+            }
+            else
+            {
+                SpawnGuaranteedRoomEnemies();
+                SpawnExtraWavePressure(wave);
+            }
 
             while (activeEnemies.Count > 0 && !gameOver)
             {
@@ -208,10 +301,10 @@ public class GameDirector : MonoBehaviour
                 yield break;
             }
 
-            if (wave < 4)
+            if (wave < 5)
             {
                 ShowStatus("Room clear. Scrap collected into armor.", 2f);
-                SpawnRoomWeaponDrops(Random.value < 0.65f ? 1 : 0);
+                SpawnRoomWeaponDrops(1);
                 yield return new WaitForSeconds(2f);
             }
         }
@@ -220,41 +313,38 @@ public class GameDirector : MonoBehaviour
         hud.SetMessage("Prototype complete. You cleared Gear Scavenger! Press Enter to replay.");
     }
 
-    private void SpawnWave(int waveNumber)
-    {
-        if (waveNumber == 4)
-        {
-            SpawnEnemy(EnemyKind.Boss, PickSpawnPoint(4.5f, 6.2f));
-            SpawnEnemy(EnemyKind.Chaser, PickSpawnPoint(3.2f, 4.8f));
-            SpawnEnemy(EnemyKind.Drone, PickSpawnPoint(3.8f, 5.8f));
-            return;
-        }
-
-        int chasers = waveNumber == 1 ? 3 : 2 + waveNumber * 2;
-        int drones = waveNumber >= 2 ? waveNumber : 0;
-        int supports = waveNumber >= 3 ? 1 : 0;
-
-        for (int i = 0; i < chasers; i++)
-        {
-            SpawnEnemy(EnemyKind.Chaser, PickSpawnPoint(3.1f, 5.6f));
-        }
-
-        for (int i = 0; i < drones; i++)
-        {
-            SpawnEnemy(EnemyKind.Drone, PickSpawnPoint(3.8f, 6.2f));
-        }
-
-        for (int i = 0; i < supports; i++)
-        {
-            SpawnEnemy(EnemyKind.Support, PickSpawnPoint(4.2f, 6.5f));
-        }
-    }
-
     private void SpawnEnemy(EnemyKind kind, Vector2 position)
     {
         EnemyController enemy = enemies.Get().GetComponent<EnemyController>();
         enemy.Configure(this, player, kind, position);
         activeEnemies.Add(enemy);
+        Debug.Log($"Gear Scavenger spawned {kind} enemy at {position}. Active enemies: {activeEnemies.Count}");
+    }
+
+    private void SpawnExtraWavePressure(int waveNumber)
+    {
+        int extraChasers = Mathf.Clamp(waveNumber, 1, 4);
+        int extraDrones = Mathf.Clamp(waveNumber - 1, 0, 3);
+        for (int i = 0; i < extraChasers; i++)
+        {
+            SpawnEnemy(EnemyKind.Chaser, PickSpawnPoint(3.6f, 7.4f));
+        }
+
+        for (int i = 0; i < extraDrones; i++)
+        {
+            SpawnEnemy(EnemyKind.Drone, PickSpawnPoint(4.4f, 7.8f));
+        }
+    }
+
+    private void SpawnBossWave()
+    {
+        SpawnEnemy(EnemyKind.Boss, PickSpawnPoint(4.8f, 7.6f));
+        SpawnEnemy(EnemyKind.Support, PickSpawnPoint(4.2f, 6.6f));
+        SpawnEnemy(EnemyKind.Support, PickSpawnPoint(4.2f, 6.6f));
+        SpawnEnemy(EnemyKind.Drone, PickSpawnPoint(4.2f, 7.1f));
+        SpawnEnemy(EnemyKind.Drone, PickSpawnPoint(4.2f, 7.1f));
+        SpawnEnemy(EnemyKind.Chaser, PickSpawnPoint(3.4f, 6.4f));
+        SpawnEnemy(EnemyKind.Chaser, PickSpawnPoint(3.4f, 6.4f));
     }
 
     private Vector2 PickSpawnPoint(float minDistance, float maxDistance)
@@ -377,11 +467,12 @@ public class GameDirector : MonoBehaviour
     private void BuildLevel()
     {
         GameObject levelRoot = new GameObject("Generated Mechanical Rooms");
-        AddRoom(-12, 0, 10, 8);
-        AddRoom(0, 0, 10, 8);
-        AddRoom(12, 0, 10, 8);
-        AddRoom(-6, 0, 4, 3);
-        AddRoom(6, 0, 4, 3);
+        rooms.Clear();
+        AddRoom(-12, 0, 10, 8, true);
+        AddRoom(0, 0, 10, 8, true);
+        AddRoom(12, 0, 10, 8, true);
+        AddRoom(-6, 0, 4, 3, false);
+        AddRoom(6, 0, 4, 3, false);
 
         foreach (Vector2Int cell in walkable)
         {
@@ -439,8 +530,16 @@ public class GameDirector : MonoBehaviour
         PlaceDecoration(levelRoot.transform, 14, -2, 1.35f);
     }
 
-    private void AddRoom(int centerX, int centerY, int width, int height)
+    private void AddRoom(int centerX, int centerY, int width, int height, bool combatRoom)
     {
+        rooms.Add(new RoomDefinition
+        {
+            Center = new Vector2(centerX, centerY),
+            Width = width,
+            Height = height,
+            CombatRoom = combatRoom
+        });
+
         int minX = centerX - width / 2;
         int maxX = centerX + width / 2;
         int minY = centerY - height / 2;
@@ -532,10 +631,8 @@ public class GameDirector : MonoBehaviour
     private GameObject CreateEnemy()
     {
         GameObject enemy = new GameObject("Enemy");
-        SpriteRenderer renderer = enemy.AddComponent<SpriteRenderer>();
-        renderer.sortingOrder = 3;
         CircleCollider2D collider = enemy.AddComponent<CircleCollider2D>();
-        collider.radius = 0.43f;
+        collider.radius = 0.42f;
         Rigidbody2D rb = enemy.AddComponent<Rigidbody2D>();
         rb.gravityScale = 0f;
         rb.freezeRotation = true;
@@ -583,28 +680,65 @@ public class GameDirector : MonoBehaviour
         if (playerObject == null)
         {
             playerObject = new GameObject("Player Scavenger");
-            playerObject.transform.position = Vector3.zero;
         }
 
-        SpriteRenderer renderer = playerObject.GetComponent<SpriteRenderer>();
-        if (renderer == null)
+        Vector2 spawnPoint = ToNearestFloorPoint(Vector2.zero);
+        playerObject.transform.position = new Vector3(spawnPoint.x, spawnPoint.y, 0f);
+        playerObject.transform.rotation = Quaternion.identity;
+        playerObject.transform.localScale = Vector3.one;
+
+        Transform visualRoot = playerObject.transform.Find("Visual Root");
+        if (visualRoot == null)
         {
-            renderer = playerObject.AddComponent<SpriteRenderer>();
+            GameObject visual = new GameObject("Visual Root");
+            visual.transform.SetParent(playerObject.transform, false);
+            visualRoot = visual.transform;
         }
 
-        renderer.sprite = PlayerSprite;
-        renderer.sortingOrder = 5;
-        playerObject.transform.localScale = Vector3.one * 1.7f;
-
-        if (playerObject.GetComponent<Rigidbody2D>() == null)
+        SpriteRenderer rootRenderer = playerObject.GetComponent<SpriteRenderer>();
+        if (rootRenderer != null)
         {
-            playerObject.AddComponent<Rigidbody2D>();
+            rootRenderer.enabled = false;
         }
 
-        if (playerObject.GetComponent<CircleCollider2D>() == null)
+        Transform bodyTransform = visualRoot.Find("Player Body");
+        if (bodyTransform == null)
         {
-            playerObject.AddComponent<CircleCollider2D>();
+            GameObject body = new GameObject("Player Body");
+            body.transform.SetParent(visualRoot, false);
+            bodyTransform = body.transform;
         }
+
+        SpriteRenderer bodyRenderer = bodyTransform.GetComponent<SpriteRenderer>();
+        if (bodyRenderer == null)
+        {
+            bodyRenderer = bodyTransform.gameObject.AddComponent<SpriteRenderer>();
+        }
+
+        bodyRenderer.enabled = true;
+        bodyRenderer.sprite = PlayerSprite;
+        bodyRenderer.sortingOrder = 5;
+        bodyTransform.localPosition = new Vector3(0f, -0.02f, 0f);
+        bodyTransform.localRotation = Quaternion.identity;
+        bodyTransform.localScale = Vector3.one * 3.85f;
+
+        Rigidbody2D rb = playerObject.GetComponent<Rigidbody2D>();
+        if (rb == null)
+        {
+            rb = playerObject.AddComponent<Rigidbody2D>();
+        }
+
+        rb.gravityScale = 0f;
+        rb.freezeRotation = true;
+        rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+
+        CircleCollider2D collider = playerObject.GetComponent<CircleCollider2D>();
+        if (collider == null)
+        {
+            collider = playerObject.AddComponent<CircleCollider2D>();
+        }
+
+        collider.radius = 0.34f;
 
         WeaponController weapon = playerObject.GetComponent<WeaponController>();
         if (weapon == null)
@@ -620,6 +754,7 @@ public class GameDirector : MonoBehaviour
 
         weapon.Initialize(this, player);
         weapon.ApplyWeapon(weaponTable[0]);
+        player.SetBodyRenderer(bodyRenderer);
         player.Initialize(this, weapon);
         mainCamera.GetComponent<CameraFollow>().Target = playerObject.transform;
     }
@@ -743,8 +878,12 @@ public class WeaponController : MonoBehaviour
     private GameDirector director;
     private PlayerController player;
     private SpriteRenderer weaponRenderer;
+    private SpriteRenderer muzzleRenderer;
+    private Transform weaponPivot;
+    private Transform muzzlePoint;
     private WeaponStats equippedStats;
     private float nextFireTime;
+    private Vector2 lastAimDirection = Vector2.right;
 
     public string CurrentWeaponName => equippedStats != null ? equippedStats.Name : "Rust Rifle";
     private float FireDelay => equippedStats != null ? equippedStats.FireDelay : core != null ? core.FireDelay : 0.14f;
@@ -769,9 +908,9 @@ public class WeaponController : MonoBehaviour
         if (weaponRenderer != null && stats != null)
         {
             weaponRenderer.sprite = stats.Sprite;
-            weaponRenderer.transform.localPosition = new Vector3(0.62f, -0.08f, -0.05f);
+            weaponRenderer.transform.localPosition = new Vector3(0.38f, 0f, -0.05f);
             weaponRenderer.transform.localRotation = Quaternion.Euler(0f, 0f, -4f);
-            weaponRenderer.transform.localScale = new Vector3(2.95f, 2.95f, 1f);
+            weaponRenderer.transform.localScale = new Vector3(4.8f, 4.8f, 1f);
         }
     }
 
@@ -782,9 +921,14 @@ public class WeaponController : MonoBehaviour
             return;
         }
 
-        Transform existing = transform.Find("Equipped Weapon");
+        Transform existingPivot = transform.Find("Weapon Pivot");
+        GameObject pivotObject = existingPivot != null ? existingPivot.gameObject : new GameObject("Weapon Pivot");
+        pivotObject.transform.SetParent(transform, false);
+        weaponPivot = pivotObject.transform;
+
+        Transform existing = weaponPivot.Find("Equipped Weapon");
         GameObject weaponObject = existing != null ? existing.gameObject : new GameObject("Equipped Weapon");
-        weaponObject.transform.SetParent(transform, false);
+        weaponObject.transform.SetParent(weaponPivot, false);
         weaponRenderer = weaponObject.GetComponent<SpriteRenderer>();
         if (weaponRenderer == null)
         {
@@ -796,6 +940,27 @@ public class WeaponController : MonoBehaviour
         {
             weaponRenderer.sprite = director.DefaultWeaponSprite;
         }
+
+        weaponRenderer.transform.localPosition = new Vector3(0.38f, 0f, -0.05f);
+        weaponRenderer.transform.localScale = new Vector3(4.8f, 4.8f, 1f);
+
+        Transform existingMuzzle = weaponPivot.Find("Muzzle");
+        GameObject muzzleObject = existingMuzzle != null ? existingMuzzle.gameObject : new GameObject("Muzzle");
+        muzzleObject.transform.SetParent(weaponPivot, false);
+        muzzlePoint = muzzleObject.transform;
+        muzzlePoint.localPosition = new Vector3(1.18f, 0f, -0.12f);
+        muzzlePoint.localRotation = Quaternion.identity;
+        muzzlePoint.localScale = Vector3.one;
+
+        muzzleRenderer = muzzleObject.GetComponent<SpriteRenderer>();
+        if (muzzleRenderer == null)
+        {
+            muzzleRenderer = muzzleObject.AddComponent<SpriteRenderer>();
+        }
+
+        muzzleRenderer.sprite = SpriteFactory.Circle(new Color(0.5f, 1f, 0.95f, 0.9f), Color.clear);
+        muzzleRenderer.sortingOrder = 10;
+        muzzleRenderer.transform.localScale = Vector3.one * 0.18f;
     }
 
     public void TryFire(Vector2 direction)
@@ -808,7 +973,7 @@ public class WeaponController : MonoBehaviour
         nextFireTime = Time.time + FireDelay;
         player.AddHeat(HeatPerShot);
 
-        Vector2 muzzle = (Vector2)transform.position + direction.normalized * 0.62f;
+        Vector2 muzzle = GetMuzzleWorldPosition(direction);
         float baseAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
         for (int i = 0; i < PelletCount; i++)
         {
@@ -821,16 +986,37 @@ public class WeaponController : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (weaponRenderer == null || player == null)
+        if (weaponPivot == null || weaponRenderer == null || player == null)
         {
             return;
         }
 
         Vector2 aim = player.AimDirection.sqrMagnitude > 0.01f ? player.AimDirection : Vector2.right;
+        lastAimDirection = aim.normalized;
         float angle = Mathf.Atan2(aim.y, aim.x) * Mathf.Rad2Deg;
-        weaponRenderer.transform.localPosition = new Vector3(aim.x >= 0f ? 0.68f : -0.68f, -0.04f, -0.05f);
-        weaponRenderer.transform.rotation = Quaternion.Euler(0f, 0f, angle);
+        weaponPivot.localPosition = new Vector3(0f, 0.05f, -0.05f);
+        weaponPivot.rotation = Quaternion.Euler(0f, 0f, angle);
         weaponRenderer.flipY = aim.x < 0f;
+        if (muzzleRenderer != null)
+        {
+            muzzleRenderer.enabled = true;
+        }
+    }
+
+    private Vector2 GetMuzzleWorldPosition(Vector2 direction)
+    {
+        Vector2 aim = direction.sqrMagnitude > 0.01f ? direction.normalized : lastAimDirection;
+        if (muzzlePoint != null)
+        {
+            return muzzlePoint.position;
+        }
+
+        if (weaponRenderer != null)
+        {
+            return (Vector2)weaponRenderer.transform.position + aim * 0.8f;
+        }
+
+        return (Vector2)transform.position + aim * 1.1f;
     }
 }
 
@@ -874,21 +1060,25 @@ public class EnemyController : MonoBehaviour
     private PlayerController player;
     private Rigidbody2D body;
     private SpriteRenderer spriteRenderer;
+    private SpriteRenderer shadowRenderer;
     private SpriteRenderer markerRenderer;
+    private SpriteRenderer healthBackRenderer;
+    private SpriteRenderer healthFillRenderer;
     private EnemyKind kind;
     private int health;
     private int maxHealth;
     private float speed;
+    private float healthBarWidth;
     private float contactTimer;
     private float shootTimer;
     private float supportPulseTimer;
+    private Color baseTint = Color.white;
     private bool active;
 
     private void Awake()
     {
         body = GetComponent<Rigidbody2D>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        EnsureMarker();
+        EnsureVisuals();
     }
 
     public void Configure(GameDirector owner, PlayerController target, EnemyKind enemyKind, Vector2 position)
@@ -896,12 +1086,14 @@ public class EnemyController : MonoBehaviour
         director = owner;
         player = target;
         kind = enemyKind;
-        transform.position = position;
+        EnsureVisuals();
+        transform.position = new Vector3(position.x, position.y, 0f);
         transform.localScale = Vector3.one;
         body.velocity = Vector2.zero;
         active = true;
         contactTimer = 0.25f;
         shootTimer = Random.Range(0.45f, 1.1f);
+        supportPulseTimer = Random.Range(0f, 1f);
 
         switch (kind)
         {
@@ -909,46 +1101,116 @@ public class EnemyController : MonoBehaviour
                 health = maxHealth = 52;
                 speed = 3.15f;
                 spriteRenderer.sprite = director.ChaserSprite;
-                transform.localScale = Vector3.one * 2.55f;
+                spriteRenderer.transform.localScale = Vector3.one * 2.75f;
+                baseTint = new Color(1f, 0.92f, 0.9f, 1f);
+                healthBarWidth = 0.95f;
                 break;
             case EnemyKind.Drone:
                 health = maxHealth = 42;
                 speed = 2.1f;
                 spriteRenderer.sprite = director.DroneSprite;
-                transform.localScale = Vector3.one * 2.6f;
+                spriteRenderer.transform.localScale = Vector3.one * 2.55f;
+                baseTint = new Color(0.95f, 0.98f, 1f, 1f);
+                healthBarWidth = 0.9f;
                 break;
             case EnemyKind.Support:
                 health = maxHealth = 64;
                 speed = 1.9f;
                 spriteRenderer.sprite = director.SupportSprite;
-                transform.localScale = Vector3.one * 2.65f;
+                spriteRenderer.transform.localScale = Vector3.one * 2.65f;
+                baseTint = new Color(0.88f, 1f, 0.9f, 1f);
+                healthBarWidth = 1f;
                 break;
             default:
                 health = maxHealth = 240;
                 speed = 2f;
                 spriteRenderer.sprite = director.BossSprite;
-                transform.localScale = Vector3.one * 3.7f;
+                spriteRenderer.transform.localScale = Vector3.one * 3.7f;
+                baseTint = new Color(1f, 0.88f, 0.86f, 1f);
+                healthBarWidth = 1.45f;
                 break;
         }
 
-        EnsureMarker();
+        spriteRenderer.enabled = true;
+        spriteRenderer.color = baseTint;
+        shadowRenderer.enabled = true;
         markerRenderer.gameObject.SetActive(true);
+        healthBackRenderer.gameObject.SetActive(true);
+        healthFillRenderer.gameObject.SetActive(true);
+        RefreshHealthBar();
     }
 
-    private void EnsureMarker()
+    private void EnsureVisuals()
     {
-        if (markerRenderer != null)
+        if (body == null)
         {
-            return;
+            body = GetComponent<Rigidbody2D>();
         }
 
-        GameObject marker = new GameObject("Enemy Marker");
-        marker.transform.SetParent(transform, false);
-        marker.transform.localPosition = new Vector3(0f, 0.48f, -0.08f);
-        marker.transform.localScale = new Vector3(0.55f, 0.08f, 1f);
-        markerRenderer = marker.AddComponent<SpriteRenderer>();
-        markerRenderer.sprite = SpriteFactory.Square(new Color(1f, 0.12f, 0.08f, 0.95f), Color.clear);
-        markerRenderer.sortingOrder = 10;
+        if (spriteRenderer == null)
+        {
+            Transform visual = transform.Find("Robot Visual");
+            GameObject visualObject = visual != null ? visual.gameObject : new GameObject("Robot Visual");
+            visualObject.transform.SetParent(transform, false);
+            visualObject.transform.localPosition = new Vector3(0f, 0f, -0.04f);
+            visualObject.transform.localRotation = Quaternion.identity;
+            spriteRenderer = visualObject.GetComponent<SpriteRenderer>();
+            if (spriteRenderer == null)
+            {
+                spriteRenderer = visualObject.AddComponent<SpriteRenderer>();
+            }
+
+            spriteRenderer.sortingOrder = 8;
+        }
+
+        if (shadowRenderer == null)
+        {
+            Transform shadow = transform.Find("Robot Shadow");
+            GameObject shadowObject = shadow != null ? shadow.gameObject : new GameObject("Robot Shadow");
+            shadowObject.transform.SetParent(transform, false);
+            shadowObject.transform.localPosition = new Vector3(0f, -0.36f, 0.05f);
+            shadowObject.transform.localRotation = Quaternion.identity;
+            shadowObject.transform.localScale = new Vector3(1.15f, 0.28f, 1f);
+            shadowRenderer = shadowObject.GetComponent<SpriteRenderer>();
+            if (shadowRenderer == null)
+            {
+                shadowRenderer = shadowObject.AddComponent<SpriteRenderer>();
+            }
+
+            shadowRenderer.sprite = SpriteFactory.Circle(new Color(0f, 0f, 0f, 0.42f), Color.clear);
+            shadowRenderer.sortingOrder = 6;
+        }
+
+        if (markerRenderer == null)
+        {
+            GameObject marker = new GameObject("Red Enemy Beacon");
+            marker.transform.SetParent(transform, false);
+            marker.transform.localPosition = new Vector3(0f, 0.62f, -0.08f);
+            marker.transform.localScale = Vector3.one * 0.22f;
+            markerRenderer = marker.AddComponent<SpriteRenderer>();
+            markerRenderer.sprite = SpriteFactory.Circle(new Color(1f, 0.08f, 0.05f, 0.95f), Color.clear);
+            markerRenderer.sortingOrder = 12;
+        }
+
+        if (healthBackRenderer == null)
+        {
+            GameObject healthBack = new GameObject("Enemy Health Back");
+            healthBack.transform.SetParent(transform, false);
+            healthBack.transform.localPosition = new Vector3(0f, 0.94f, -0.08f);
+            healthBackRenderer = healthBack.AddComponent<SpriteRenderer>();
+            healthBackRenderer.sprite = SpriteFactory.Square(new Color(0.05f, 0.05f, 0.05f, 0.9f), Color.clear);
+            healthBackRenderer.sortingOrder = 13;
+        }
+
+        if (healthFillRenderer == null)
+        {
+            GameObject healthFill = new GameObject("Enemy Health Fill");
+            healthFill.transform.SetParent(transform, false);
+            healthFill.transform.localPosition = new Vector3(0f, 0.94f, -0.09f);
+            healthFillRenderer = healthFill.AddComponent<SpriteRenderer>();
+            healthFillRenderer.sprite = SpriteFactory.Square(new Color(1f, 0.18f, 0.08f, 0.95f), Color.clear);
+            healthFillRenderer.sortingOrder = 14;
+        }
     }
 
     private void FixedUpdate()
@@ -1024,10 +1286,25 @@ public class EnemyController : MonoBehaviour
 
         health -= amount;
         body.AddForce(knockback, ForceMode2D.Impulse);
+        RefreshHealthBar();
         if (health <= 0)
         {
             Die();
         }
+    }
+
+    private void RefreshHealthBar()
+    {
+        if (healthBackRenderer == null || healthFillRenderer == null)
+        {
+            return;
+        }
+
+        float healthRatio = maxHealth > 0 ? Mathf.Clamp01((float)health / maxHealth) : 0f;
+        float barHeight = kind == EnemyKind.Boss ? 0.09f : 0.075f;
+        healthBackRenderer.transform.localScale = new Vector3(healthBarWidth, barHeight, 1f);
+        healthFillRenderer.transform.localScale = new Vector3(Mathf.Max(0.04f, healthBarWidth * healthRatio), barHeight * 0.62f, 1f);
+        healthFillRenderer.transform.localPosition = new Vector3(-(healthBarWidth - healthBarWidth * healthRatio) * 0.5f, 0.94f, -0.09f);
     }
 
     private void FireAtPlayer()
@@ -1080,7 +1357,26 @@ public class EnemyController : MonoBehaviour
     private void Die()
     {
         active = false;
-        markerRenderer.gameObject.SetActive(false);
+        if (markerRenderer != null)
+        {
+            markerRenderer.gameObject.SetActive(false);
+        }
+
+        if (healthBackRenderer != null)
+        {
+            healthBackRenderer.gameObject.SetActive(false);
+        }
+
+        if (healthFillRenderer != null)
+        {
+            healthFillRenderer.gameObject.SetActive(false);
+        }
+
+        if (shadowRenderer != null)
+        {
+            shadowRenderer.enabled = false;
+        }
+
         int scrapValue = kind == EnemyKind.Boss ? 12 : Mathf.Max(2, maxHealth / 24);
         for (int i = 0; i < scrapValue; i++)
         {
@@ -1182,6 +1478,7 @@ public class WeaponPickup : MonoBehaviour
 public class GameHud
 {
     private readonly PlayerController player;
+    private readonly GameDirector director;
     private readonly Image armorFill;
     private readonly Image heatFill;
     private readonly Image damageOverlay;
@@ -1189,9 +1486,10 @@ public class GameHud
     private readonly Text statsText;
     private float damageFlash;
 
-    private GameHud(PlayerController playerController, Image armor, Image heat, Image damage, Text status, Text stats)
+    private GameHud(PlayerController playerController, GameDirector owner, Image armor, Image heat, Image damage, Text status, Text stats)
     {
         player = playerController;
+        director = owner;
         armorFill = armor;
         heatFill = heat;
         damageOverlay = damage;
@@ -1199,7 +1497,7 @@ public class GameHud
         statsText = stats;
     }
 
-    public static GameHud Create(PlayerController player)
+    public static GameHud Create(PlayerController player, GameDirector owner)
     {
         GameObject canvasObject = new GameObject("HUD");
         Canvas canvas = canvasObject.AddComponent<Canvas>();
@@ -1235,7 +1533,7 @@ public class GameHud
         status.rectTransform.sizeDelta = new Vector2(-40f, 50f);
         status.color = new Color(0.92f, 0.96f, 1f);
 
-        return new GameHud(player, armorFill, heatFill, damage, status, stats);
+        return new GameHud(player, owner, armorFill, heatFill, damage, status, stats);
     }
 
     public void Refresh(int wave, int enemyCount)
@@ -1243,7 +1541,9 @@ public class GameHud
         armorFill.fillAmount = Mathf.Clamp01((float)player.Armor / player.MaxArmor);
         heatFill.fillAmount = Mathf.Clamp01(player.Heat / player.MaxHeat);
         heatFill.color = player.IsOverheated ? new Color(1f, 0.08f, 0.05f) : new Color(1f, 0.45f, 0.14f);
-        statsText.text = $"Armor {player.Armor}/{player.MaxArmor}   Heat {Mathf.RoundToInt(player.Heat)}%   Scrap {player.Scrap}   Weapon {player.WeaponName}   Wave {wave}/4   Enemies {enemyCount}";
+        int pickupCount = director != null ? director.ActiveWeaponPickupCount() : 0;
+
+        statsText.text = $"Armor {player.Armor}/{player.MaxArmor}   Heat {Mathf.RoundToInt(player.Heat)}%   Scrap {player.Scrap}   Weapon {player.WeaponName}   Wave {wave}/5   Enemies {enemyCount}   Pickups {pickupCount}";
 
         if (damageFlash > 0f)
         {
