@@ -72,10 +72,11 @@ public class GameDirector : MonoBehaviour
         BuildLevel();
         BuildPools();
         SpawnPlayer();
-        hud = GameHud.Create(player, this);
         SpawnStarterWeaponDrops();
         SpawnVisibleStarterEnemies();
         SpawnGuaranteedRoomEnemies();
+        ValidateStartupSpawns();
+        CreateHudSafely();
         ShowStatus($"Ready: {activeEnemies.Count} enemies across all rooms, 3 weapons near player", 3.5f);
         StartCoroutine(WaveRoutine());
     }
@@ -233,6 +234,34 @@ public class GameDirector : MonoBehaviour
         statusTimer = seconds;
     }
 
+    private void CreateHudSafely()
+    {
+        try
+        {
+            hud = GameHud.Create(player, this);
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogError($"Gear Scavenger HUD failed to create, but gameplay spawning will continue. {exception}");
+        }
+    }
+
+    private void ValidateStartupSpawns()
+    {
+        if (ActiveWeaponPickupCount() == 0)
+        {
+            Debug.LogWarning("Gear Scavenger startup found zero weapon pickups. Rebuilding starter weapon drops.");
+            SpawnStarterWeaponDrops();
+        }
+
+        if (activeEnemies.Count == 0)
+        {
+            Debug.LogWarning("Gear Scavenger startup found zero enemies. Rebuilding guaranteed enemy set.");
+            SpawnVisibleStarterEnemies();
+            SpawnGuaranteedRoomEnemies();
+        }
+    }
+
     public int ActiveWeaponPickupCount()
     {
         int count = 0;
@@ -256,7 +285,7 @@ public class GameDirector : MonoBehaviour
     public void PlayerDied()
     {
         gameOver = true;
-        hud.SetMessage("Armor destroyed. Press Enter to rebuild the scavenger.");
+        hud?.SetMessage("Armor destroyed. Press Enter to rebuild the scavenger.");
     }
 
     public void PlayPurgeEffect(Vector2 position, float radius)
@@ -310,7 +339,7 @@ public class GameDirector : MonoBehaviour
         }
 
         gameOver = true;
-        hud.SetMessage("Prototype complete. You cleared Gear Scavenger! Press Enter to replay.");
+        hud?.SetMessage("Prototype complete. You cleared Gear Scavenger! Press Enter to replay.");
     }
 
     private void SpawnEnemy(EnemyKind kind, Vector2 position)
@@ -1567,7 +1596,7 @@ public class GameHud
         GameObject obj = new GameObject(name);
         obj.transform.SetParent(parent, false);
         Text text = obj.AddComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         text.fontSize = size;
         text.alignment = alignment;
         text.text = content;
