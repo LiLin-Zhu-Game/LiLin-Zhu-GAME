@@ -27,6 +27,7 @@ public class GameDirector : MonoBehaviour
         public int Width;
         public int Height;
         public bool CombatRoom;
+        public int Difficulty;
     }
 
     private readonly List<EnemyController> activeEnemies = new List<EnemyController>();
@@ -47,6 +48,9 @@ public class GameDirector : MonoBehaviour
     private Sprite[] propSprites;
     private WeaponStats[] weaponTable;
     private int wave;
+    private int salvageCores;
+    private int defeatedMachines;
+    private int roomsCleared;
     private bool gameOver;
     private float statusTimer;
 
@@ -62,6 +66,9 @@ public class GameDirector : MonoBehaviour
     public Sprite ScrapSprite { get; private set; }
     public Sprite DefaultWeaponSprite { get; private set; }
     public Sprite FloorDetailSprite { get; private set; }
+    public int SalvageCores => salvageCores;
+    public int DefeatedMachines => defeatedMachines;
+    public int RoomsCleared => roomsCleared;
 
     private void Start()
     {
@@ -77,7 +84,7 @@ public class GameDirector : MonoBehaviour
         SpawnGuaranteedRoomEnemies();
         ValidateStartupSpawns();
         CreateHudSafely();
-        ShowStatus($"Ready: {activeEnemies.Count} enemies across all rooms, 3 weapons near player", 3.5f);
+        ShowStatus($"Objective: clear rooms, collect 3 salvage cores, then survive the boss.", 4f);
         StartCoroutine(WaveRoutine());
     }
 
@@ -90,7 +97,7 @@ public class GameDirector : MonoBehaviour
             statusTimer -= Time.deltaTime;
             if (statusTimer <= 0f && !gameOver)
             {
-                hud.SetMessage("WASD move  |  Mouse aim/fire  |  Space dash  |  R purge heat");
+                hud?.SetMessage("Clear rooms -> collect salvage cores -> adapt weapons -> defeat the breaker boss");
             }
         }
 
@@ -103,14 +110,15 @@ public class GameDirector : MonoBehaviour
     private void OnGUI()
     {
         Color previous = GUI.color;
-        Rect panel = new Rect(12f, 12f, 390f, 108f);
+        Rect panel = new Rect(12f, 12f, 430f, 132f);
         GUI.color = new Color(0f, 0f, 0f, 0.72f);
         GUI.DrawTexture(panel, Texture2D.whiteTexture);
         GUI.color = Color.white;
-        GUI.Label(new Rect(24f, 20f, 360f, 24f), "HUD / Debug: top-left game state");
-        GUI.Label(new Rect(24f, 44f, 360f, 24f), $"Enemies active: {activeEnemies.Count}");
-        GUI.Label(new Rect(24f, 68f, 360f, 24f), $"Weapon pickups: {ActiveWeaponPickupCount()}");
-        GUI.Label(new Rect(24f, 92f, 360f, 24f), "E = equip weapon    Mouse = aim/fire");
+        GUI.Label(new Rect(24f, 20f, 400f, 24f), "HUD / Debug: top-left game state");
+        GUI.Label(new Rect(24f, 44f, 400f, 24f), $"Enemies active: {activeEnemies.Count}    Weapon pickups: {ActiveWeaponPickupCount()}");
+        GUI.Label(new Rect(24f, 68f, 400f, 24f), $"Salvage cores: {salvageCores}/3    Machines defeated: {defeatedMachines}");
+        GUI.Label(new Rect(24f, 92f, 400f, 24f), "Goal: clear rooms, upgrade weapons, defeat the breaker boss");
+        GUI.Label(new Rect(24f, 116f, 400f, 24f), "E = equip weapon    Mouse = aim/fire    R = purge heat");
         GUI.color = previous;
     }
 
@@ -151,6 +159,24 @@ public class GameDirector : MonoBehaviour
         WeaponPickup pickup = weaponPickups.Get().GetComponent<WeaponPickup>();
         WeaponStats stats = weaponTable[Random.Range(0, weaponTable.Length)];
         pickup.Configure(position + Random.insideUnitCircle * 0.75f, stats);
+    }
+
+    public void RewardEnemyDefeat(EnemyKind kind, Vector2 position)
+    {
+        defeatedMachines++;
+        int bonusScrap = kind == EnemyKind.Boss ? 10 : kind == EnemyKind.Support ? 4 : 2;
+        for (int i = 0; i < bonusScrap; i++)
+        {
+            SpawnScrap(position, 1);
+        }
+
+        if (defeatedMachines % 6 == 0 && weaponTable != null && weaponTable.Length > 0)
+        {
+            WeaponPickup pickup = weaponPickups.Get().GetComponent<WeaponPickup>();
+            WeaponStats reward = weaponTable[Mathf.Clamp(1 + roomsCleared, 0, weaponTable.Length - 1)];
+            pickup.Configure(ToNearestFloorPoint(position + Random.insideUnitCircle * 1.2f), reward);
+            ShowStatus($"Scavenged upgrade: {reward.Name}", 2.2f);
+        }
     }
 
     public void SpawnRoomWeaponDrops(int count)
@@ -215,9 +241,15 @@ public class GameDirector : MonoBehaviour
         SpawnEnemy(EnemyKind.Chaser, ToNearestFloorPoint(center + new Vector2(rx, -ry)));
         SpawnEnemy(EnemyKind.Drone, ToNearestFloorPoint(center + new Vector2(0f, ry)));
 
-        if (includeSupport)
+        if (includeSupport || room.Difficulty >= 2)
         {
             SpawnEnemy(EnemyKind.Support, ToNearestFloorPoint(center + new Vector2(0f, -ry * 0.15f)));
+        }
+
+        if (room.Difficulty >= 3)
+        {
+            SpawnEnemy(EnemyKind.Drone, ToNearestFloorPoint(center + new Vector2(-rx * 0.35f, ry * 0.35f)));
+            SpawnEnemy(EnemyKind.Chaser, ToNearestFloorPoint(center + new Vector2(rx * 0.35f, ry * 0.15f)));
         }
     }
 
@@ -306,10 +338,12 @@ public class GameDirector : MonoBehaviour
             yield return null;
         }
 
+        AwardRoomClearReward("First sweep complete: armor repaired and a salvage core recovered.");
+
         for (wave = 2; wave <= 5; wave++)
         {
             bool isBossWave = wave == 5;
-            ShowStatus(isBossWave ? "Boss wave: survive the breaker unit" : $"Wave {wave}: rooms repopulated", 2.2f);
+            ShowStatus(isBossWave ? "Boss wave: the breaker unit guards the final core" : $"Threat level {wave}: rooms reconstruct with tougher machines", 2.2f);
             if (isBossWave)
             {
                 SpawnBossWave();
@@ -332,14 +366,22 @@ public class GameDirector : MonoBehaviour
 
             if (wave < 5)
             {
-                ShowStatus("Room clear. Scrap collected into armor.", 2f);
+                AwardRoomClearReward("Room clear: salvage core secured, armor repaired, weapon cache opened.");
                 SpawnRoomWeaponDrops(1);
                 yield return new WaitForSeconds(2f);
             }
         }
 
         gameOver = true;
-        hud?.SetMessage("Prototype complete. You cleared Gear Scavenger! Press Enter to replay.");
+        hud?.SetMessage("Prototype complete. You escaped the mechanical ruin with the salvage core. Press Enter to replay.");
+    }
+
+    private void AwardRoomClearReward(string message)
+    {
+        roomsCleared++;
+        salvageCores = Mathf.Min(3, salvageCores + 1);
+        player?.RepairArmor(18 + roomsCleared * 4);
+        ShowStatus($"{message}  Cores {salvageCores}/3", 2.4f);
     }
 
     private void SpawnEnemy(EnemyKind kind, Vector2 position)
@@ -497,11 +539,11 @@ public class GameDirector : MonoBehaviour
     {
         GameObject levelRoot = new GameObject("Generated Mechanical Rooms");
         rooms.Clear();
-        AddRoom(-12, 0, 10, 8, true);
-        AddRoom(0, 0, 10, 8, true);
-        AddRoom(12, 0, 10, 8, true);
-        AddRoom(-6, 0, 4, 3, false);
-        AddRoom(6, 0, 4, 3, false);
+        AddRoom(-12, 0, 10, 8, true, 1);
+        AddRoom(0, 0, 10, 8, true, 2);
+        AddRoom(12, 0, 10, 8, true, 3);
+        AddRoom(-6, 0, 4, 3, false, 0);
+        AddRoom(6, 0, 4, 3, false, 0);
 
         foreach (Vector2Int cell in walkable)
         {
@@ -559,14 +601,15 @@ public class GameDirector : MonoBehaviour
         PlaceDecoration(levelRoot.transform, 14, -2, 1.35f);
     }
 
-    private void AddRoom(int centerX, int centerY, int width, int height, bool combatRoom)
+    private void AddRoom(int centerX, int centerY, int width, int height, bool combatRoom, int difficulty)
     {
         rooms.Add(new RoomDefinition
         {
             Center = new Vector2(centerX, centerY),
             Width = width,
             Height = height,
-            CombatRoom = combatRoom
+            CombatRoom = combatRoom,
+            Difficulty = difficulty
         });
 
         int minX = centerX - width / 2;
@@ -1386,6 +1429,7 @@ public class EnemyController : MonoBehaviour
     private void Die()
     {
         active = false;
+        Vector2 deathPosition = transform.position;
         if (markerRenderer != null)
         {
             markerRenderer.gameObject.SetActive(false);
@@ -1409,10 +1453,11 @@ public class EnemyController : MonoBehaviour
         int scrapValue = kind == EnemyKind.Boss ? 12 : Mathf.Max(2, maxHealth / 24);
         for (int i = 0; i < scrapValue; i++)
         {
-            director.SpawnScrap(transform.position, 1);
+            director.SpawnScrap(deathPosition, 1);
         }
 
-        director.TrySpawnWeaponDrop(transform.position, kind == EnemyKind.Boss ? 1f : 0.18f);
+        director.RewardEnemyDefeat(kind, deathPosition);
+        director.TrySpawnWeaponDrop(deathPosition, kind == EnemyKind.Boss ? 1f : 0.18f);
         director.ReleaseEnemy(this);
     }
 }
@@ -1572,7 +1617,9 @@ public class GameHud
         heatFill.color = player.IsOverheated ? new Color(1f, 0.08f, 0.05f) : new Color(1f, 0.45f, 0.14f);
         int pickupCount = director != null ? director.ActiveWeaponPickupCount() : 0;
 
-        statsText.text = $"Armor {player.Armor}/{player.MaxArmor}   Heat {Mathf.RoundToInt(player.Heat)}%   Scrap {player.Scrap}   Weapon {player.WeaponName}   Wave {wave}/5   Enemies {enemyCount}   Pickups {pickupCount}";
+        int cores = director != null ? director.SalvageCores : 0;
+        int kills = director != null ? director.DefeatedMachines : 0;
+        statsText.text = $"Armor {player.Armor}/{player.MaxArmor}   Heat {Mathf.RoundToInt(player.Heat)}%   Scrap {player.Scrap}   Cores {cores}/3   Kills {kills}   Weapon {player.WeaponName}   Wave {wave}/5   Enemies {enemyCount}   Pickups {pickupCount}";
 
         if (damageFlash > 0f)
         {

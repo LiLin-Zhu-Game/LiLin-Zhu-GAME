@@ -168,6 +168,16 @@ public class PlayerController : MonoBehaviour
         armor = Mathf.Min(maxArmor, armor + amount * 4);
     }
 
+    public void RepairArmor(int amount)
+    {
+        if (dead)
+        {
+            return;
+        }
+
+        armor = Mathf.Min(maxArmor, armor + amount);
+    }
+
     public void EquipWeapon(WeaponStats stats)
     {
         if (weapon == null || stats == null)
