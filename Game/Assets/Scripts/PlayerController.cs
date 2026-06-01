@@ -178,6 +178,20 @@ public class PlayerController : MonoBehaviour
         armor = Mathf.Min(maxArmor, armor + amount);
     }
 
+    public void CoolWeapon(float amount)
+    {
+        if (dead)
+        {
+            return;
+        }
+
+        Heat = Mathf.Max(0f, Heat - amount);
+        if (overheated && Heat <= overheatRecoveryHeat)
+        {
+            overheated = false;
+        }
+    }
+
     public void EquipWeapon(WeaponStats stats)
     {
         if (weapon == null || stats == null)

@@ -66,6 +66,7 @@ public class GameDirector : MonoBehaviour
     public Sprite ScrapSprite { get; private set; }
     public Sprite DefaultWeaponSprite { get; private set; }
     public Sprite FloorDetailSprite { get; private set; }
+    public Sprite SupplyStationSprite { get; private set; }
     public int SalvageCores => salvageCores;
     public int DefeatedMachines => defeatedMachines;
     public int RoomsCleared => roomsCleared;
@@ -76,6 +77,7 @@ public class GameDirector : MonoBehaviour
         Random.InitState(System.DateTime.Now.Millisecond);
         BuildSprites();
         ConfigureCamera();
+        RemoveEditorPreviewMap();
         BuildLevel();
         BuildPools();
         SpawnPlayer();
@@ -490,6 +492,7 @@ public class GameDirector : MonoBehaviour
         FloorDetailSprite = SpriteFactory.Square(new Color(0.08f, 0.09f, 0.1f, 0.45f), Color.clear);
         ScrapSprite = LoadSprite("scrap", SpriteFactory.Diamond(new Color(0.55f, 0.85f, 1f), new Color(0.04f, 0.13f, 0.22f)));
         DefaultWeaponSprite = LoadSprite("weapon_rifle", SpriteFactory.Diamond(new Color(0.85f, 0.55f, 1f), new Color(0.12f, 0.04f, 0.18f)));
+        SupplyStationSprite = SpriteFactory.Circle(new Color(0.25f, 0.95f, 1f, 0.82f), new Color(0.02f, 0.22f, 0.28f, 0.95f));
 
         weaponTable = new[]
         {
@@ -537,13 +540,21 @@ public class GameDirector : MonoBehaviour
 
     private void BuildLevel()
     {
+        RemoveSceneObject("Generated Mechanical Rooms");
         GameObject levelRoot = new GameObject("Generated Mechanical Rooms");
+        walkable.Clear();
+        floorCells.Clear();
         rooms.Clear();
-        AddRoom(-12, 0, 10, 8, true, 1);
-        AddRoom(0, 0, 10, 8, true, 2);
-        AddRoom(12, 0, 10, 8, true, 3);
-        AddRoom(-6, 0, 4, 3, false, 0);
-        AddRoom(6, 0, 4, 3, false, 0);
+
+        AddRoom(0, 0, 10, 8, true, 1);
+        AddRoom(-13, 0, 9, 8, true, 1);
+        AddRoom(13, 0, 9, 8, true, 2);
+        AddRoom(0, 10, 8, 7, true, 2);
+        AddRoom(0, -10, 10, 7, true, 3);
+        AddCorridor(-6, 0, 4, 3);
+        AddCorridor(6, 0, 4, 3);
+        AddCorridor(0, 5, 3, 4);
+        AddCorridor(0, -5, 3, 4);
 
         foreach (Vector2Int cell in walkable)
         {
@@ -592,13 +603,23 @@ public class GameDirector : MonoBehaviour
             wall.AddComponent<WallMarker>();
         }
 
-        PlaceDecoration(levelRoot.transform, -13, 2, 1.25f);
-        PlaceDecoration(levelRoot.transform, -9, -2, 0.9f);
-        PlaceDecoration(levelRoot.transform, -4, 3, 0.8f);
-        PlaceDecoration(levelRoot.transform, 0, 2, 1.1f);
-        PlaceDecoration(levelRoot.transform, 4, -3, 0.8f);
+        PlaceDecoration(levelRoot.transform, -15, 2, 1.15f);
+        PlaceDecoration(levelRoot.transform, -12, -2, 0.9f);
+        PlaceDecoration(levelRoot.transform, -9, 2, 0.85f);
+        PlaceDecoration(levelRoot.transform, -3, 2, 0.8f);
+        PlaceDecoration(levelRoot.transform, 3, -2, 0.9f);
         PlaceDecoration(levelRoot.transform, 10, 2, 1.0f);
-        PlaceDecoration(levelRoot.transform, 14, -2, 1.35f);
+        PlaceDecoration(levelRoot.transform, 15, -2, 1.2f);
+        PlaceDecoration(levelRoot.transform, -2, 11, 1.05f);
+        PlaceDecoration(levelRoot.transform, 2, 9, 0.9f);
+        PlaceDecoration(levelRoot.transform, -2, -9, 1.05f);
+        PlaceDecoration(levelRoot.transform, 3, -11, 1.25f);
+        PlaceFloorFeature(levelRoot.transform, -13, 0, 2.2f, 0.95f, new Color(0.18f, 0.5f, 0.52f, 0.5f));
+        PlaceFloorFeature(levelRoot.transform, 0, 10, 2.6f, 1.1f, new Color(0.16f, 0.75f, 0.95f, 0.42f));
+        PlaceFloorFeature(levelRoot.transform, 13, 0, 2.4f, 0.9f, new Color(0.35f, 0.1f, 0.08f, 0.42f));
+        PlaceFloorFeature(levelRoot.transform, 0, -10, 2.7f, 1.15f, new Color(0.42f, 0.12f, 0.5f, 0.38f));
+        PlaceSupplyStation(levelRoot.transform, -2, 0, "Repair Station");
+        PlaceSupplyStation(levelRoot.transform, 0, 9, "Cooling Station");
     }
 
     private void AddRoom(int centerX, int centerY, int width, int height, bool combatRoom, int difficulty)
@@ -612,6 +633,16 @@ public class GameDirector : MonoBehaviour
             Difficulty = difficulty
         });
 
+        AddWalkableRect(centerX, centerY, width, height);
+    }
+
+    private void AddCorridor(int centerX, int centerY, int width, int height)
+    {
+        AddWalkableRect(centerX, centerY, width, height);
+    }
+
+    private void AddWalkableRect(int centerX, int centerY, int width, int height)
+    {
         int minX = centerX - width / 2;
         int maxX = centerX + width / 2;
         int minY = centerY - height / 2;
@@ -650,6 +681,49 @@ public class GameDirector : MonoBehaviour
         BoxCollider2D collider = prop.AddComponent<BoxCollider2D>();
         collider.size = Vector2.one * 0.8f;
         prop.AddComponent<WallMarker>();
+    }
+
+    private void PlaceFloorFeature(Transform root, int x, int y, float width, float height, Color color)
+    {
+        GameObject feature = new GameObject("Coolant/Oil Floor Feature");
+        feature.transform.SetParent(root);
+        feature.transform.position = new Vector3(x, y, 0.82f);
+        feature.transform.localScale = new Vector3(width, height, 1f);
+        SpriteRenderer renderer = feature.AddComponent<SpriteRenderer>();
+        renderer.sprite = FloorDetailSprite;
+        renderer.color = color;
+        renderer.sortingOrder = -8;
+    }
+
+    private void PlaceSupplyStation(Transform root, int x, int y, string stationName)
+    {
+        GameObject station = new GameObject(stationName);
+        station.transform.SetParent(root);
+        station.transform.position = new Vector3(x, y, -0.08f);
+        station.transform.localScale = Vector3.one * 1.35f;
+        SpriteRenderer renderer = station.AddComponent<SpriteRenderer>();
+        renderer.sprite = SupplyStationSprite;
+        renderer.sortingOrder = 2;
+        CircleCollider2D collider = station.AddComponent<CircleCollider2D>();
+        collider.radius = 0.44f;
+        collider.isTrigger = true;
+        station.AddComponent<SupplyStation>().Configure(this, stationName.Contains("Cooling"));
+    }
+
+    private void RemoveEditorPreviewMap()
+    {
+        RemoveSceneObject("Gear Scavenger Editor Preview");
+    }
+
+    private void RemoveSceneObject(string objectName)
+    {
+        GameObject existing = GameObject.Find(objectName);
+        if (existing == null)
+        {
+            return;
+        }
+
+        Destroy(existing);
     }
 
     private void BuildPools()
@@ -1546,6 +1620,45 @@ public class WeaponPickup : MonoBehaviour
         glowRenderer = glow.AddComponent<SpriteRenderer>();
         glowRenderer.sprite = SpriteFactory.Circle(new Color(0.35f, 0.85f, 1f, 0.32f), Color.clear);
         glowRenderer.sortingOrder = 5;
+    }
+}
+
+public class SupplyStation : MonoBehaviour
+{
+    private GameDirector director;
+    private bool coolingStation;
+    private float nextUseTime;
+
+    public void Configure(GameDirector owner, bool coolsWeapon)
+    {
+        director = owner;
+        coolingStation = coolsWeapon;
+    }
+
+    private void OnTriggerStay2D(Collider2D other)
+    {
+        if (Time.time < nextUseTime)
+        {
+            return;
+        }
+
+        PlayerController player = other.GetComponent<PlayerController>();
+        if (player == null)
+        {
+            return;
+        }
+
+        nextUseTime = Time.time + 1.25f;
+        if (coolingStation)
+        {
+            player.CoolWeapon(24f);
+            director.ShowStatus("Cooling station vented weapon heat", 1.2f);
+        }
+        else
+        {
+            player.RepairArmor(10);
+            director.ShowStatus("Repair station restored armor", 1.2f);
+        }
     }
 }
 
