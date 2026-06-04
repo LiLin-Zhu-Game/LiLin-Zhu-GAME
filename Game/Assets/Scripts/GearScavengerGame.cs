@@ -28,11 +28,13 @@ public class GameDirector : MonoBehaviour
         public int Height;
         public bool CombatRoom;
         public int Difficulty;
+        public string Name;
     }
 
     private readonly List<EnemyController> activeEnemies = new List<EnemyController>();
     private readonly List<Vector2Int> floorCells = new List<Vector2Int>();
     private readonly HashSet<Vector2Int> walkable = new HashSet<Vector2Int>();
+    private readonly HashSet<Vector2Int> blockedCells = new HashSet<Vector2Int>();
     private readonly List<RoomDefinition> rooms = new List<RoomDefinition>();
 
     private ObjectPool playerBullets;
@@ -67,6 +69,9 @@ public class GameDirector : MonoBehaviour
     public Sprite DefaultWeaponSprite { get; private set; }
     public Sprite FloorDetailSprite { get; private set; }
     public Sprite SupplyStationSprite { get; private set; }
+    public Sprite CrateSprite { get; private set; }
+    public Sprite BarrelSprite { get; private set; }
+    public Sprite TerminalSprite { get; private set; }
     public int SalvageCores => salvageCores;
     public int DefeatedMachines => defeatedMachines;
     public int RoomsCleared => roomsCleared;
@@ -82,7 +87,6 @@ public class GameDirector : MonoBehaviour
         BuildPools();
         SpawnPlayer();
         SpawnStarterWeaponDrops();
-        SpawnVisibleStarterEnemies();
         SpawnGuaranteedRoomEnemies();
         ValidateStartupSpawns();
         CreateHudSafely();
@@ -92,7 +96,7 @@ public class GameDirector : MonoBehaviour
 
     private void Update()
     {
-        hud?.Refresh(wave, activeEnemies.Count);
+        hud?.Refresh(wave, AlertEnemyCount(), activeEnemies.Count);
 
         if (statusTimer > 0f)
         {
@@ -117,7 +121,7 @@ public class GameDirector : MonoBehaviour
         GUI.DrawTexture(panel, Texture2D.whiteTexture);
         GUI.color = Color.white;
         GUI.Label(new Rect(24f, 20f, 400f, 24f), "HUD / Debug: top-left game state");
-        GUI.Label(new Rect(24f, 44f, 400f, 24f), $"Enemies active: {activeEnemies.Count}    Weapon pickups: {ActiveWeaponPickupCount()}");
+        GUI.Label(new Rect(24f, 44f, 400f, 24f), $"Enemies awake: {AlertEnemyCount()}/{activeEnemies.Count}    Weapon pickups: {ActiveWeaponPickupCount()}");
         GUI.Label(new Rect(24f, 68f, 400f, 24f), $"Salvage cores: {salvageCores}/3    Machines defeated: {defeatedMachines}");
         GUI.Label(new Rect(24f, 92f, 400f, 24f), "Goal: clear rooms, upgrade weapons, defeat the breaker boss");
         GUI.Label(new Rect(24f, 116f, 400f, 24f), "E = equip weapon    Mouse = aim/fire    R = purge heat");
@@ -160,7 +164,7 @@ public class GameDirector : MonoBehaviour
 
         WeaponPickup pickup = weaponPickups.Get().GetComponent<WeaponPickup>();
         WeaponStats stats = weaponTable[Random.Range(0, weaponTable.Length)];
-        pickup.Configure(position + Random.insideUnitCircle * 0.75f, stats);
+        pickup.Configure(ToNearestFloorPoint(position + Random.insideUnitCircle * 0.75f), stats);
     }
 
     public void RewardEnemyDefeat(EnemyKind kind, Vector2 position)
@@ -204,9 +208,8 @@ public class GameDirector : MonoBehaviour
 
     public void SpawnVisibleStarterEnemies()
     {
-        SpawnEnemy(EnemyKind.Chaser, ToNearestFloorPoint((Vector2)player.transform.position + new Vector2(-3f, 1.6f)));
-        SpawnEnemy(EnemyKind.Chaser, ToNearestFloorPoint((Vector2)player.transform.position + new Vector2(3f, 1.6f)));
-        SpawnEnemy(EnemyKind.Drone, ToNearestFloorPoint((Vector2)player.transform.position + new Vector2(0f, 3.2f)));
+        RoomDefinition room = GetFirstCombatRoom();
+        SpawnRoomEnemySet(room, false);
     }
 
     public void SpawnGuaranteedRoomEnemies()
@@ -235,23 +238,22 @@ public class GameDirector : MonoBehaviour
 
     private void SpawnRoomEnemySet(RoomDefinition room, bool includeSupport)
     {
-        Vector2 center = room.Center;
         float rx = Mathf.Max(1.6f, room.Width * 0.28f);
         float ry = Mathf.Max(1.4f, room.Height * 0.24f);
 
-        SpawnEnemy(EnemyKind.Chaser, ToNearestFloorPoint(center + new Vector2(-rx, -ry)));
-        SpawnEnemy(EnemyKind.Chaser, ToNearestFloorPoint(center + new Vector2(rx, -ry)));
-        SpawnEnemy(EnemyKind.Drone, ToNearestFloorPoint(center + new Vector2(0f, ry)));
+        SpawnEnemy(EnemyKind.Chaser, PickRoomFloorPoint(room, new Vector2(-rx, -ry)));
+        SpawnEnemy(EnemyKind.Chaser, PickRoomFloorPoint(room, new Vector2(rx, -ry)));
+        SpawnEnemy(EnemyKind.Drone, PickRoomFloorPoint(room, new Vector2(0f, ry)));
 
         if (includeSupport || room.Difficulty >= 2)
         {
-            SpawnEnemy(EnemyKind.Support, ToNearestFloorPoint(center + new Vector2(0f, -ry * 0.15f)));
+            SpawnEnemy(EnemyKind.Support, PickRoomFloorPoint(room, new Vector2(0f, -ry * 0.15f)));
         }
 
         if (room.Difficulty >= 3)
         {
-            SpawnEnemy(EnemyKind.Drone, ToNearestFloorPoint(center + new Vector2(-rx * 0.35f, ry * 0.35f)));
-            SpawnEnemy(EnemyKind.Chaser, ToNearestFloorPoint(center + new Vector2(rx * 0.35f, ry * 0.15f)));
+            SpawnEnemy(EnemyKind.Drone, PickRoomFloorPoint(room, new Vector2(-rx * 0.35f, ry * 0.35f)));
+            SpawnEnemy(EnemyKind.Chaser, PickRoomFloorPoint(room, new Vector2(rx * 0.35f, ry * 0.15f)));
         }
     }
 
@@ -291,8 +293,11 @@ public class GameDirector : MonoBehaviour
         if (activeEnemies.Count == 0)
         {
             Debug.LogWarning("Gear Scavenger startup found zero enemies. Rebuilding guaranteed enemy set.");
-            SpawnVisibleStarterEnemies();
             SpawnGuaranteedRoomEnemies();
+            if (activeEnemies.Count == 0 && rooms.Count > 0)
+            {
+                SpawnVisibleStarterEnemies();
+            }
         }
     }
 
@@ -303,6 +308,20 @@ public class GameDirector : MonoBehaviour
         foreach (WeaponPickup pickup in allPickups)
         {
             if (pickup.gameObject.activeInHierarchy)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    public int AlertEnemyCount()
+    {
+        int count = 0;
+        foreach (EnemyController enemy in activeEnemies)
+        {
+            if (enemy != null && enemy.gameObject.activeInHierarchy && enemy.IsAwake)
             {
                 count++;
             }
@@ -400,29 +419,30 @@ public class GameDirector : MonoBehaviour
         int extraDrones = Mathf.Clamp(waveNumber - 1, 0, 3);
         for (int i = 0; i < extraChasers; i++)
         {
-            SpawnEnemy(EnemyKind.Chaser, PickSpawnPoint(3.6f, 7.4f));
+            SpawnEnemy(EnemyKind.Chaser, PickCombatSpawnPoint(waveNumber + i));
         }
 
         for (int i = 0; i < extraDrones; i++)
         {
-            SpawnEnemy(EnemyKind.Drone, PickSpawnPoint(4.4f, 7.8f));
+            SpawnEnemy(EnemyKind.Drone, PickCombatSpawnPoint(waveNumber + extraChasers + i));
         }
     }
 
     private void SpawnBossWave()
     {
-        SpawnEnemy(EnemyKind.Boss, PickSpawnPoint(4.8f, 7.6f));
-        SpawnEnemy(EnemyKind.Support, PickSpawnPoint(4.2f, 6.6f));
-        SpawnEnemy(EnemyKind.Support, PickSpawnPoint(4.2f, 6.6f));
-        SpawnEnemy(EnemyKind.Drone, PickSpawnPoint(4.2f, 7.1f));
-        SpawnEnemy(EnemyKind.Drone, PickSpawnPoint(4.2f, 7.1f));
-        SpawnEnemy(EnemyKind.Chaser, PickSpawnPoint(3.4f, 6.4f));
-        SpawnEnemy(EnemyKind.Chaser, PickSpawnPoint(3.4f, 6.4f));
+        RoomDefinition room = GetBossRoom();
+        SpawnEnemy(EnemyKind.Boss, PickRoomFloorPoint(room, Vector2.zero));
+        SpawnEnemy(EnemyKind.Support, PickRoomFloorPoint(room, new Vector2(-3f, -1.2f)));
+        SpawnEnemy(EnemyKind.Support, PickRoomFloorPoint(room, new Vector2(3f, -1.2f)));
+        SpawnEnemy(EnemyKind.Drone, PickRoomFloorPoint(room, new Vector2(-2.6f, 1.6f)));
+        SpawnEnemy(EnemyKind.Drone, PickRoomFloorPoint(room, new Vector2(2.6f, 1.6f)));
+        SpawnEnemy(EnemyKind.Chaser, PickRoomFloorPoint(room, new Vector2(-3.2f, 0f)));
+        SpawnEnemy(EnemyKind.Chaser, PickRoomFloorPoint(room, new Vector2(3.2f, 0f)));
     }
 
     private Vector2 PickSpawnPoint(float minDistance, float maxDistance)
     {
-        return PickNearbyFloorPoint(minDistance, maxDistance);
+        return PickCombatSpawnPoint(Mathf.RoundToInt(minDistance + maxDistance));
     }
 
     private Vector2 PickNearbyFloorPoint(float minDistance, float maxDistance)
@@ -447,7 +467,7 @@ public class GameDirector : MonoBehaviour
     private Vector2 ToNearestFloorPoint(Vector2 candidate)
     {
         Vector2Int rounded = Vector2Int.RoundToInt(candidate);
-        if (walkable.Contains(rounded))
+        if (IsFreeFloorCell(rounded))
         {
             return new Vector2(rounded.x, rounded.y);
         }
@@ -456,6 +476,11 @@ public class GameDirector : MonoBehaviour
         float bestDistance = float.MaxValue;
         foreach (Vector2Int cell in floorCells)
         {
+            if (!IsFreeFloorCell(cell))
+            {
+                continue;
+            }
+
             float distance = Vector2.SqrMagnitude(candidate - new Vector2(cell.x, cell.y));
             if (distance < bestDistance)
             {
@@ -465,6 +490,122 @@ public class GameDirector : MonoBehaviour
         }
 
         return best;
+    }
+
+    private RoomDefinition GetFirstCombatRoom()
+    {
+        foreach (RoomDefinition room in rooms)
+        {
+            if (room.CombatRoom)
+            {
+                return room;
+            }
+        }
+
+        return rooms.Count > 0 ? rooms[0] : new RoomDefinition
+        {
+            Center = Vector2.zero,
+            Width = 10,
+            Height = 8,
+            CombatRoom = false,
+            Difficulty = 0,
+            Name = "Fallback Room"
+        };
+    }
+
+    private RoomDefinition GetBossRoom()
+    {
+        for (int i = 0; i < rooms.Count; i++)
+        {
+            if (rooms[i].Difficulty >= 3)
+            {
+                return rooms[i];
+            }
+        }
+
+        return GetFirstCombatRoom();
+    }
+
+    private Vector2 PickCombatSpawnPoint(int seedOffset)
+    {
+        RoomDefinition room = GetFirstCombatRoom();
+        int combatRoomCount = 0;
+        foreach (RoomDefinition candidate in rooms)
+        {
+            if (candidate.CombatRoom)
+            {
+                combatRoomCount++;
+            }
+        }
+
+        if (combatRoomCount > 0)
+        {
+            int targetIndex = Mathf.Abs(seedOffset + wave + roomsCleared) % combatRoomCount;
+            int currentIndex = 0;
+            foreach (RoomDefinition candidate in rooms)
+            {
+                if (!candidate.CombatRoom)
+                {
+                    continue;
+                }
+
+                if (currentIndex == targetIndex)
+                {
+                    room = candidate;
+                    break;
+                }
+
+                currentIndex++;
+            }
+        }
+
+        float angle = Random.Range(0f, Mathf.PI * 2f);
+        float rx = Random.Range(-room.Width * 0.28f, room.Width * 0.28f);
+        float ry = Random.Range(-room.Height * 0.24f, room.Height * 0.24f);
+        Vector2 offset = new Vector2(rx + Mathf.Cos(angle) * 0.7f, ry + Mathf.Sin(angle) * 0.7f);
+        return PickRoomFloorPoint(room, offset);
+    }
+
+    private Vector2 PickRoomFloorPoint(RoomDefinition room, Vector2 offset)
+    {
+        Vector2 candidate = room.Center + offset;
+        Vector2Int rounded = Vector2Int.RoundToInt(candidate);
+        if (IsFreeFloorCell(rounded) && IsInsideRoom(room, rounded))
+        {
+            return new Vector2(rounded.x, rounded.y);
+        }
+
+        int searchRadius = Mathf.Max(room.Width, room.Height);
+        for (int radius = 1; radius <= searchRadius; radius++)
+        {
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    Vector2Int cell = rounded + new Vector2Int(dx, dy);
+                    if (IsInsideRoom(room, cell) && IsFreeFloorCell(cell))
+                    {
+                        return new Vector2(cell.x, cell.y);
+                    }
+                }
+            }
+        }
+
+        return ToNearestFloorPoint(room.Center);
+    }
+
+    private bool IsInsideRoom(RoomDefinition room, Vector2Int cell)
+    {
+        int minX = Mathf.RoundToInt(room.Center.x) - room.Width / 2;
+        int maxX = Mathf.RoundToInt(room.Center.x) + room.Width / 2;
+        int minY = Mathf.RoundToInt(room.Center.y) - room.Height / 2;
+        int maxY = Mathf.RoundToInt(room.Center.y) + room.Height / 2;
+        return cell.x >= minX && cell.x <= maxX && cell.y >= minY && cell.y <= maxY;
+    }
+
+    private bool IsFreeFloorCell(Vector2Int cell)
+    {
+        return walkable.Contains(cell) && !blockedCells.Contains(cell);
     }
 
     private void BuildSprites()
@@ -493,6 +634,9 @@ public class GameDirector : MonoBehaviour
         ScrapSprite = LoadSprite("scrap", SpriteFactory.Diamond(new Color(0.55f, 0.85f, 1f), new Color(0.04f, 0.13f, 0.22f)));
         DefaultWeaponSprite = LoadSprite("weapon_rifle", SpriteFactory.Diamond(new Color(0.85f, 0.55f, 1f), new Color(0.12f, 0.04f, 0.18f)));
         SupplyStationSprite = SpriteFactory.Circle(new Color(0.25f, 0.95f, 1f, 0.82f), new Color(0.02f, 0.22f, 0.28f, 0.95f));
+        CrateSprite = LoadSprite("crate", SpriteFactory.Square(new Color(0.48f, 0.34f, 0.18f), new Color(0.16f, 0.1f, 0.04f)));
+        BarrelSprite = LoadSprite("barrel", SpriteFactory.Circle(new Color(0.55f, 0.17f, 0.12f), new Color(0.12f, 0.06f, 0.05f)));
+        TerminalSprite = LoadSprite("terminal", SpriteFactory.Diamond(new Color(0.12f, 0.88f, 0.62f), new Color(0.02f, 0.16f, 0.13f)));
 
         weaponTable = new[]
         {
@@ -544,13 +688,14 @@ public class GameDirector : MonoBehaviour
         GameObject levelRoot = new GameObject("Generated Mechanical Rooms");
         walkable.Clear();
         floorCells.Clear();
+        blockedCells.Clear();
         rooms.Clear();
 
-        AddRoom(0, 0, 10, 8, true, 1);
-        AddRoom(-13, 0, 9, 8, true, 1);
-        AddRoom(13, 0, 9, 8, true, 2);
-        AddRoom(0, 10, 8, 7, true, 2);
-        AddRoom(0, -10, 10, 7, true, 3);
+        AddRoom(0, 0, 10, 8, false, 0, "Start Workshop");
+        AddRoom(-13, 0, 9, 8, true, 1, "Scrap Yard");
+        AddRoom(13, 0, 9, 8, true, 2, "Assembly Maze");
+        AddRoom(0, 10, 8, 7, true, 2, "Cache Room");
+        AddRoom(0, -10, 10, 7, true, 3, "Breaker Vault");
         AddCorridor(-6, 0, 4, 3);
         AddCorridor(6, 0, 4, 3);
         AddCorridor(0, 5, 3, 4);
@@ -603,17 +748,7 @@ public class GameDirector : MonoBehaviour
             wall.AddComponent<WallMarker>();
         }
 
-        PlaceDecoration(levelRoot.transform, -15, 2, 1.15f);
-        PlaceDecoration(levelRoot.transform, -12, -2, 0.9f);
-        PlaceDecoration(levelRoot.transform, -9, 2, 0.85f);
-        PlaceDecoration(levelRoot.transform, -3, 2, 0.8f);
-        PlaceDecoration(levelRoot.transform, 3, -2, 0.9f);
-        PlaceDecoration(levelRoot.transform, 10, 2, 1.0f);
-        PlaceDecoration(levelRoot.transform, 15, -2, 1.2f);
-        PlaceDecoration(levelRoot.transform, -2, 11, 1.05f);
-        PlaceDecoration(levelRoot.transform, 2, 9, 0.9f);
-        PlaceDecoration(levelRoot.transform, -2, -9, 1.05f);
-        PlaceDecoration(levelRoot.transform, 3, -11, 1.25f);
+        PlaceRoomDressing(levelRoot.transform);
         PlaceFloorFeature(levelRoot.transform, -13, 0, 2.2f, 0.95f, new Color(0.18f, 0.5f, 0.52f, 0.5f));
         PlaceFloorFeature(levelRoot.transform, 0, 10, 2.6f, 1.1f, new Color(0.16f, 0.75f, 0.95f, 0.42f));
         PlaceFloorFeature(levelRoot.transform, 13, 0, 2.4f, 0.9f, new Color(0.35f, 0.1f, 0.08f, 0.42f));
@@ -622,7 +757,7 @@ public class GameDirector : MonoBehaviour
         PlaceSupplyStation(levelRoot.transform, 0, 9, "Cooling Station");
     }
 
-    private void AddRoom(int centerX, int centerY, int width, int height, bool combatRoom, int difficulty)
+    private void AddRoom(int centerX, int centerY, int width, int height, bool combatRoom, int difficulty, string roomName)
     {
         rooms.Add(new RoomDefinition
         {
@@ -630,7 +765,8 @@ public class GameDirector : MonoBehaviour
             Width = width,
             Height = height,
             CombatRoom = combatRoom,
-            Difficulty = difficulty
+            Difficulty = difficulty,
+            Name = roomName
         });
 
         AddWalkableRect(centerX, centerY, width, height);
@@ -669,18 +805,116 @@ public class GameDirector : MonoBehaviour
         }
     }
 
-    private void PlaceDecoration(Transform root, int x, int y, float scale)
+    private void PlaceRoomDressing(Transform root)
     {
-        GameObject prop = new GameObject("Scrap Machinery");
+        PlaceTerminal(root, 0, 3, "Mission Terminal");
+        PlaceCrateCluster(root, -4, 3, 2, 1);
+        PlaceCrateCluster(root, 3, 3, 2, 1);
+        PlaceCrateCluster(root, -4, -3, 1, 2);
+        PlaceCrateCluster(root, 4, -3, 1, 2);
+        PlaceBarrel(root, -2, -3, false);
+        PlaceBarrel(root, 2, -3, false);
+
+        PlaceDecoration(root, -16, 2, 1.15f);
+        PlaceDecoration(root, -11, -2, 0.9f);
+        PlaceCrateLine(root, -15, -1, 3, true);
+        PlaceCrateLine(root, -12, 2, 3, true);
+        PlaceCrateCluster(root, -16, -3, 2, 1);
+        PlaceBarrel(root, -10, 3, true);
+        PlaceBarrel(root, -13, -3, false);
+
+        PlaceDecoration(root, 10, 2, 1.0f);
+        PlaceDecoration(root, 15, -2, 1.2f);
+        PlaceCrateLine(root, 11, -2, 3, false);
+        PlaceCrateLine(root, 15, 1, 3, false);
+        PlaceCrateCluster(root, 13, -3, 2, 1);
+        PlaceBarrel(root, 16, 3, true);
+        PlaceTerminal(root, 13, 3, "Factory Console");
+
+        PlaceCrateCluster(root, -3, 12, 2, 1);
+        PlaceCrateCluster(root, 2, 12, 2, 1);
+        PlaceCrateLine(root, -3, 8, 2, false);
+        PlaceCrateLine(root, 3, 8, 2, false);
+        PlaceDecoration(root, -2, 11, 1.05f);
+        PlaceDecoration(root, 2, 9, 0.9f);
+        PlaceTerminal(root, 0, 12, "Cache Uplink");
+
+        PlaceDecoration(root, -4, -12, 1.2f);
+        PlaceDecoration(root, 4, -12, 1.2f);
+        PlaceDecoration(root, -4, -8, 1.05f);
+        PlaceDecoration(root, 4, -8, 1.05f);
+        PlaceCrateLine(root, -2, -11, 2, true);
+        PlaceCrateLine(root, 2, -9, 2, true);
+        PlaceBarrel(root, -1, -12, true);
+        PlaceBarrel(root, 2, -8, true);
+        PlaceTerminal(root, 0, -13, "Boss Core");
+    }
+
+    private void PlaceCrateCluster(Transform root, int startX, int startY, int columns, int rows)
+    {
+        for (int x = 0; x < columns; x++)
+        {
+            for (int y = 0; y < rows; y++)
+            {
+                PlaceCrate(root, startX + x, startY + y);
+            }
+        }
+    }
+
+    private void PlaceCrateLine(Transform root, int startX, int startY, int count, bool horizontal)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            PlaceCrate(root, startX + (horizontal ? i : 0), startY + (horizontal ? 0 : i));
+        }
+    }
+
+    private void PlaceCrate(Transform root, int x, int y)
+    {
+        GameObject crate = CreateBlockingProp(root, "Breakable Crate", x, y, 0.95f, CrateSprite, -2, new Vector2(0.82f, 0.82f));
+        crate.AddComponent<DestructibleProp>().Configure(this, 36, 3, 0.08f, false);
+    }
+
+    private void PlaceBarrel(Transform root, int x, int y, bool volatileBarrel)
+    {
+        GameObject barrel = CreateBlockingProp(root, volatileBarrel ? "Volatile Fuel Barrel" : "Scrap Barrel", x, y, 0.9f, BarrelSprite, -2, new Vector2(0.72f, 0.72f));
+        barrel.AddComponent<DestructibleProp>().Configure(this, volatileBarrel ? 28 : 34, volatileBarrel ? 4 : 2, volatileBarrel ? 0.14f : 0.04f, volatileBarrel);
+    }
+
+    private void PlaceTerminal(Transform root, int x, int y, string terminalName)
+    {
+        GameObject terminal = CreateBlockingProp(root, terminalName, x, y, 1.05f, TerminalSprite, -2, new Vector2(0.72f, 0.72f));
+        terminal.AddComponent<DestructibleProp>().Configure(this, 58, 5, 0.16f, false);
+    }
+
+    private GameObject CreateBlockingProp(Transform root, string name, int x, int y, float scale, Sprite sprite, int sortingOrder, Vector2 colliderSize)
+    {
+        GameObject prop = new GameObject(name);
         prop.transform.SetParent(root);
         prop.transform.position = new Vector3(x, y, -0.05f);
         prop.transform.localScale = Vector3.one * scale;
         SpriteRenderer renderer = prop.AddComponent<SpriteRenderer>();
-        renderer.sprite = propSprites[Random.Range(0, propSprites.Length)];
-        renderer.sortingOrder = -2;
+        renderer.sprite = sprite;
+        renderer.sortingOrder = sortingOrder;
         BoxCollider2D collider = prop.AddComponent<BoxCollider2D>();
-        collider.size = Vector2.one * 0.8f;
+        collider.size = colliderSize;
         prop.AddComponent<WallMarker>();
+        RegisterBlockedCell(x, y);
+        return prop;
+    }
+
+    private void PlaceDecoration(Transform root, int x, int y, float scale)
+    {
+        CreateBlockingProp(root, "Scrap Machinery", x, y, scale, propSprites[Random.Range(0, propSprites.Length)], -2, Vector2.one * 0.8f);
+    }
+
+    private void RegisterBlockedCell(int x, int y)
+    {
+        Vector2Int cell = new Vector2Int(x, y);
+        if (walkable.Contains(cell))
+        {
+            blockedCells.Add(cell);
+        }
     }
 
     private void PlaceFloorFeature(Transform root, int x, int y, float width, float height, Color color)
@@ -988,19 +1222,22 @@ public class Bullet : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.GetComponent<WallMarker>() != null)
-        {
-            director.ReleaseBullet(this);
-            return;
-        }
-
         if (owner == BulletOwner.Player)
         {
+            DestructibleProp prop = other.GetComponent<DestructibleProp>();
+            if (prop != null)
+            {
+                prop.TakeDamage(damage, velocity.normalized);
+                director.ReleaseBullet(this);
+                return;
+            }
+
             EnemyController enemy = other.GetComponent<EnemyController>();
             if (enemy != null)
             {
                 enemy.TakeDamage(damage, velocity.normalized * 2.5f);
                 director.ReleaseBullet(this);
+                return;
             }
         }
         else
@@ -1010,7 +1247,13 @@ public class Bullet : MonoBehaviour
             {
                 player.TakeDamage(damage);
                 director.ReleaseBullet(this);
+                return;
             }
+        }
+
+        if (other.GetComponent<WallMarker>() != null)
+        {
+            director.ReleaseBullet(this);
         }
     }
 }
@@ -1218,8 +1461,13 @@ public class EnemyController : MonoBehaviour
     private float contactTimer;
     private float shootTimer;
     private float supportPulseTimer;
+    private float wakeDistance;
+    private Vector2 spawnPosition;
     private Color baseTint = Color.white;
     private bool active;
+    private bool awakened;
+
+    public bool IsAwake => active && awakened;
 
     private void Awake()
     {
@@ -1235,8 +1483,10 @@ public class EnemyController : MonoBehaviour
         EnsureVisuals();
         transform.position = new Vector3(position.x, position.y, 0f);
         transform.localScale = Vector3.one;
+        spawnPosition = position;
         body.velocity = Vector2.zero;
         active = true;
+        awakened = false;
         contactTimer = 0.25f;
         shootTimer = Random.Range(0.45f, 1.1f);
         supportPulseTimer = Random.Range(0f, 1f);
@@ -1277,10 +1527,12 @@ public class EnemyController : MonoBehaviour
                 break;
         }
 
+        wakeDistance = kind == EnemyKind.Boss ? 9.2f : kind == EnemyKind.Drone ? 7.2f : 6.6f;
         spriteRenderer.enabled = true;
-        spriteRenderer.color = baseTint;
+        spriteRenderer.color = baseTint * 0.62f;
         shadowRenderer.enabled = true;
         markerRenderer.gameObject.SetActive(true);
+        markerRenderer.color = new Color(0.35f, 0.75f, 1f, 0.88f);
         healthBackRenderer.gameObject.SetActive(true);
         healthFillRenderer.gameObject.SetActive(true);
         RefreshHealthBar();
@@ -1367,6 +1619,13 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
+        if (!awakened)
+        {
+            body.velocity = Vector2.zero;
+            TryWakeUp();
+            return;
+        }
+
         Vector2 toPlayer = player.transform.position - transform.position;
         float distance = toPlayer.magnitude;
         Vector2 direction = distance > 0.01f ? toPlayer / distance : Vector2.zero;
@@ -1395,6 +1654,15 @@ public class EnemyController : MonoBehaviour
     {
         if (!active || player == null || player.IsDead)
         {
+            return;
+        }
+
+        if (!awakened)
+        {
+            TryWakeUp();
+            float dormantPulse = 0.5f + Mathf.Sin(Time.time * 3.2f + spawnPosition.x) * 0.08f;
+            spriteRenderer.color = new Color(baseTint.r * dormantPulse, baseTint.g * dormantPulse, baseTint.b * (dormantPulse + 0.2f), 0.9f);
+            markerRenderer.color = new Color(0.25f, 0.75f, 1f, 0.75f + Mathf.Sin(Time.time * 4f) * 0.18f);
             return;
         }
 
@@ -1430,6 +1698,7 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
+        WakeUp();
         health -= amount;
         body.AddForce(knockback, ForceMode2D.Impulse);
         RefreshHealthBar();
@@ -1468,6 +1737,36 @@ public class EnemyController : MonoBehaviour
         }
     }
 
+    private void TryWakeUp()
+    {
+        if (player == null)
+        {
+            return;
+        }
+
+        float playerDistance = Vector2.Distance(player.transform.position, transform.position);
+        float spawnDistance = Vector2.Distance(player.transform.position, spawnPosition);
+        if (playerDistance <= wakeDistance || spawnDistance <= wakeDistance)
+        {
+            WakeUp();
+        }
+    }
+
+    private void WakeUp()
+    {
+        if (awakened)
+        {
+            return;
+        }
+
+        awakened = true;
+        contactTimer = 0.35f;
+        shootTimer = Random.Range(0.35f, 0.9f);
+        spriteRenderer.color = baseTint;
+        markerRenderer.color = new Color(1f, 0.08f, 0.05f, 0.95f);
+        director?.ShowStatus($"{kind} machine awakened", 0.9f);
+    }
+
     private bool IsSupported()
     {
         if (kind == EnemyKind.Support)
@@ -1495,6 +1794,7 @@ public class EnemyController : MonoBehaviour
         PlayerController hitPlayer = collision.collider.GetComponent<PlayerController>();
         if (hitPlayer != null && contactTimer <= 0f)
         {
+            WakeUp();
             hitPlayer.TakeDamage(kind == EnemyKind.Boss ? 18 : 10);
             contactTimer = 0.7f;
         }
@@ -1533,6 +1833,109 @@ public class EnemyController : MonoBehaviour
         director.RewardEnemyDefeat(kind, deathPosition);
         director.TrySpawnWeaponDrop(deathPosition, kind == EnemyKind.Boss ? 1f : 0.18f);
         director.ReleaseEnemy(this);
+    }
+}
+
+public class DestructibleProp : MonoBehaviour
+{
+    private GameDirector director;
+    private SpriteRenderer spriteRenderer;
+    private int health;
+    private int scrapDrops;
+    private float weaponDropChance;
+    private bool volatileProp;
+    private bool destroyed;
+    private Color baseColor = Color.white;
+
+    public void Configure(GameDirector owner, int hitPoints, int scrapCount, float dropChance, bool explosive)
+    {
+        director = owner;
+        health = hitPoints;
+        scrapDrops = scrapCount;
+        weaponDropChance = dropChance;
+        volatileProp = explosive;
+        destroyed = false;
+
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null)
+        {
+            baseColor = spriteRenderer.color;
+        }
+    }
+
+    public void TakeDamage(int amount, Vector2 hitDirection)
+    {
+        if (destroyed)
+        {
+            return;
+        }
+
+        health -= amount;
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = Color.Lerp(baseColor, Color.white, 0.45f);
+        }
+
+        if (health <= 0)
+        {
+            BreakApart(hitDirection);
+        }
+    }
+
+    private void LateUpdate()
+    {
+        if (!destroyed && spriteRenderer != null)
+        {
+            spriteRenderer.color = Color.Lerp(spriteRenderer.color, baseColor, Time.deltaTime * 8f);
+        }
+    }
+
+    private void BreakApart(Vector2 hitDirection)
+    {
+        destroyed = true;
+        Vector2 origin = transform.position;
+        int finalScrap = volatileProp ? scrapDrops + 2 : scrapDrops;
+        for (int i = 0; i < finalScrap; i++)
+        {
+            Vector2 scatter = Random.insideUnitCircle * 0.8f + hitDirection.normalized * 0.15f;
+            director.SpawnScrap(origin + scatter, 1);
+        }
+
+        director.TrySpawnWeaponDrop(origin, weaponDropChance);
+        if (volatileProp)
+        {
+            Explode(origin);
+        }
+
+        Destroy(gameObject);
+    }
+
+    private void Explode(Vector2 origin)
+    {
+        const float radius = 2.4f;
+        director.PlayPurgeEffect(origin, radius);
+        EnemyController[] enemies = FindObjectsOfType<EnemyController>();
+        foreach (EnemyController enemy in enemies)
+        {
+            if (!enemy.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            Vector2 offset = (Vector2)enemy.transform.position - origin;
+            if (offset.magnitude <= radius)
+            {
+                enemy.TakeDamage(30, offset.normalized * 5.5f);
+            }
+        }
+
+        PlayerController player = FindObjectOfType<PlayerController>();
+        if (player != null && Vector2.Distance(player.transform.position, origin) <= radius * 0.85f)
+        {
+            player.TakeDamage(8);
+        }
+
+        director.ShowStatus("Fuel barrel detonated", 1f);
     }
 }
 
@@ -1723,7 +2126,7 @@ public class GameHud
         return new GameHud(player, owner, armorFill, heatFill, damage, status, stats);
     }
 
-    public void Refresh(int wave, int enemyCount)
+    public void Refresh(int wave, int awakeEnemyCount, int totalEnemyCount)
     {
         armorFill.fillAmount = Mathf.Clamp01((float)player.Armor / player.MaxArmor);
         heatFill.fillAmount = Mathf.Clamp01(player.Heat / player.MaxHeat);
@@ -1732,7 +2135,7 @@ public class GameHud
 
         int cores = director != null ? director.SalvageCores : 0;
         int kills = director != null ? director.DefeatedMachines : 0;
-        statsText.text = $"Armor {player.Armor}/{player.MaxArmor}   Heat {Mathf.RoundToInt(player.Heat)}%   Scrap {player.Scrap}   Cores {cores}/3   Kills {kills}   Weapon {player.WeaponName}   Wave {wave}/5   Enemies {enemyCount}   Pickups {pickupCount}";
+        statsText.text = $"Armor {player.Armor}/{player.MaxArmor}   Heat {Mathf.RoundToInt(player.Heat)}%   Scrap {player.Scrap}   Cores {cores}/3   Kills {kills}   Weapon {player.WeaponName}   Wave {wave}/5   Awake {awakeEnemyCount}/{totalEnemyCount}   Pickups {pickupCount}";
 
         if (damageFlash > 0f)
         {

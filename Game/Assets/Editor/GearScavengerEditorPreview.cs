@@ -65,23 +65,13 @@ public static class GearScavengerEditorPreview
             AddWall(root.transform, wall.x, wall.y);
         }
 
-        AddLabel(root.transform, "Start Room", new Vector3(0f, 4.85f, 0f), new Color(0.5f, 1f, 0.95f, 1f));
-        AddLabel(root.transform, "Left Combat Room", new Vector3(-13f, 4.85f, 0f), new Color(1f, 0.55f, 0.38f, 1f));
-        AddLabel(root.transform, "Right Combat Room", new Vector3(13f, 4.85f, 0f), new Color(1f, 0.55f, 0.38f, 1f));
-        AddLabel(root.transform, "North Cache Room", new Vector3(0f, 13.85f, 0f), new Color(0.55f, 0.85f, 1f, 1f));
-        AddLabel(root.transform, "South Boss Room", new Vector3(0f, -5.85f, 0f), new Color(1f, 0.35f, 0.8f, 1f));
+        AddLabel(root.transform, "Safe Workshop", new Vector3(0f, 4.85f, 0f), new Color(0.5f, 1f, 0.95f, 1f));
+        AddLabel(root.transform, "Scrap Yard", new Vector3(-13f, 4.85f, 0f), new Color(1f, 0.68f, 0.38f, 1f));
+        AddLabel(root.transform, "Assembly Maze", new Vector3(13f, 4.85f, 0f), new Color(1f, 0.68f, 0.38f, 1f));
+        AddLabel(root.transform, "Cache Room", new Vector3(0f, 13.85f, 0f), new Color(0.55f, 0.85f, 1f, 1f));
+        AddLabel(root.transform, "Breaker Vault", new Vector3(0f, -5.85f, 0f), new Color(1f, 0.35f, 0.8f, 1f));
 
-        AddObstacle(root.transform, -15, 2, 1.15f);
-        AddObstacle(root.transform, -12, -2, 0.9f);
-        AddObstacle(root.transform, -9, 2, 0.85f);
-        AddObstacle(root.transform, -3, 2, 0.8f);
-        AddObstacle(root.transform, 3, -2, 0.9f);
-        AddObstacle(root.transform, 10, 2, 1.0f);
-        AddObstacle(root.transform, 15, -2, 1.2f);
-        AddObstacle(root.transform, -2, 11, 1.05f);
-        AddObstacle(root.transform, 2, 9, 0.9f);
-        AddObstacle(root.transform, -2, -9, 1.05f);
-        AddObstacle(root.transform, 3, -11, 1.25f);
+        PlacePreviewDressing(root.transform);
 
         AddFloorFeature(root.transform, -13, 0, 2.2f, 0.95f, new Color(0.18f, 0.5f, 0.52f, 0.5f));
         AddFloorFeature(root.transform, 0, 10, 2.6f, 1.1f, new Color(0.16f, 0.75f, 0.95f, 0.42f));
@@ -156,13 +146,114 @@ public static class GearScavengerEditorPreview
 
     private static void AddObstacle(Transform root, int x, int y, float scale)
     {
-        GameObject obstacle = new GameObject("Preview Scrap Obstacle");
-        obstacle.transform.SetParent(root, false);
-        obstacle.transform.position = new Vector3(x, y, -0.05f);
-        obstacle.transform.localScale = Vector3.one * scale;
-        SpriteRenderer renderer = obstacle.AddComponent<SpriteRenderer>();
-        renderer.sprite = PreviewSpriteCache.Diamond;
-        renderer.color = new Color(0.55f, 0.62f, 0.62f, 0.9f);
+        AddPreviewProp(root, "Preview Scrap Machinery", new Vector3(x, y, -0.05f), Vector3.one * scale, PreviewSpriteCache.Diamond, new Color(0.55f, 0.62f, 0.62f, 0.9f));
+    }
+
+    private static void PlacePreviewDressing(Transform root)
+    {
+        AddTerminal(root, 0, 3, "Preview Mission Terminal");
+        AddCrateCluster(root, -4, 3, 2, 1);
+        AddCrateCluster(root, 3, 3, 2, 1);
+        AddCrateCluster(root, -4, -3, 1, 2);
+        AddCrateCluster(root, 4, -3, 1, 2);
+        AddBarrel(root, -2, -3, false);
+        AddBarrel(root, 2, -3, false);
+
+        AddObstacle(root, -16, 2, 1.15f);
+        AddObstacle(root, -11, -2, 0.9f);
+        AddCrateLine(root, -15, -1, 3, true);
+        AddCrateLine(root, -12, 2, 3, true);
+        AddCrateCluster(root, -16, -3, 2, 1);
+        AddBarrel(root, -10, 3, true);
+        AddBarrel(root, -13, -3, false);
+        AddDormantEnemy(root, -14, 1);
+        AddDormantEnemy(root, -12, -1);
+        AddDormantEnemy(root, -10, 2);
+
+        AddObstacle(root, 10, 2, 1.0f);
+        AddObstacle(root, 15, -2, 1.2f);
+        AddCrateLine(root, 11, -2, 3, false);
+        AddCrateLine(root, 15, 1, 3, false);
+        AddCrateCluster(root, 13, -3, 2, 1);
+        AddBarrel(root, 16, 3, true);
+        AddTerminal(root, 13, 3, "Preview Factory Console");
+        AddDormantEnemy(root, 11, 1);
+        AddDormantEnemy(root, 13, -1);
+        AddDormantEnemy(root, 15, 2);
+
+        AddCrateCluster(root, -3, 12, 2, 1);
+        AddCrateCluster(root, 2, 12, 2, 1);
+        AddCrateLine(root, -3, 8, 2, false);
+        AddCrateLine(root, 3, 8, 2, false);
+        AddObstacle(root, -2, 11, 1.05f);
+        AddObstacle(root, 2, 9, 0.9f);
+        AddTerminal(root, 0, 12, "Preview Cache Uplink");
+        AddDormantEnemy(root, -1, 10);
+        AddDormantEnemy(root, 2, 10);
+
+        AddObstacle(root, -4, -12, 1.2f);
+        AddObstacle(root, 4, -12, 1.2f);
+        AddObstacle(root, -4, -8, 1.05f);
+        AddObstacle(root, 4, -8, 1.05f);
+        AddCrateLine(root, -2, -11, 2, true);
+        AddCrateLine(root, 2, -9, 2, true);
+        AddBarrel(root, -1, -12, true);
+        AddBarrel(root, 2, -8, true);
+        AddTerminal(root, 0, -13, "Preview Boss Core");
+        AddDormantEnemy(root, 0, -10);
+        AddDormantEnemy(root, -3, -9);
+        AddDormantEnemy(root, 3, -9);
+    }
+
+    private static void AddCrateCluster(Transform root, int startX, int startY, int columns, int rows)
+    {
+        for (int x = 0; x < columns; x++)
+        {
+            for (int y = 0; y < rows; y++)
+            {
+                AddCrate(root, startX + x, startY + y);
+            }
+        }
+    }
+
+    private static void AddCrateLine(Transform root, int startX, int startY, int count, bool horizontal)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            AddCrate(root, startX + (horizontal ? i : 0), startY + (horizontal ? 0 : i));
+        }
+    }
+
+    private static void AddCrate(Transform root, int x, int y)
+    {
+        AddPreviewProp(root, "Preview Breakable Crate", new Vector3(x, y, -0.05f), Vector3.one * 0.82f, PreviewSpriteCache.Square, new Color(0.56f, 0.38f, 0.18f, 0.95f));
+    }
+
+    private static void AddBarrel(Transform root, int x, int y, bool volatileBarrel)
+    {
+        Color color = volatileBarrel ? new Color(0.9f, 0.2f, 0.1f, 0.95f) : new Color(0.55f, 0.34f, 0.24f, 0.95f);
+        AddPreviewProp(root, volatileBarrel ? "Preview Fuel Barrel" : "Preview Scrap Barrel", new Vector3(x, y, -0.06f), Vector3.one * 0.72f, PreviewSpriteCache.Circle, color);
+    }
+
+    private static void AddTerminal(Transform root, int x, int y, string name)
+    {
+        AddPreviewProp(root, name, new Vector3(x, y, -0.07f), Vector3.one * 0.9f, PreviewSpriteCache.Diamond, new Color(0.15f, 0.95f, 0.66f, 0.96f));
+    }
+
+    private static void AddDormantEnemy(Transform root, int x, int y)
+    {
+        AddPreviewProp(root, "Preview Dormant Enemy", new Vector3(x, y, -0.08f), Vector3.one * 0.52f, PreviewSpriteCache.Circle, new Color(0.25f, 0.68f, 1f, 0.86f));
+    }
+
+    private static void AddPreviewProp(Transform root, string name, Vector3 position, Vector3 scale, Sprite sprite, Color color)
+    {
+        GameObject prop = new GameObject(name);
+        prop.transform.SetParent(root, false);
+        prop.transform.position = position;
+        prop.transform.localScale = scale;
+        SpriteRenderer renderer = prop.AddComponent<SpriteRenderer>();
+        renderer.sprite = sprite;
+        renderer.color = color;
         renderer.sortingOrder = -30;
     }
 
