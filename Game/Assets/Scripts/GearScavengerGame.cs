@@ -116,15 +116,15 @@ public class GameDirector : MonoBehaviour
     private void OnGUI()
     {
         Color previous = GUI.color;
-        Rect panel = new Rect(12f, 12f, 430f, 132f);
+        Rect panel = new Rect(12f, 12f, 520f, 132f);
         GUI.color = new Color(0f, 0f, 0f, 0.72f);
         GUI.DrawTexture(panel, Texture2D.whiteTexture);
         GUI.color = Color.white;
-        GUI.Label(new Rect(24f, 20f, 400f, 24f), "HUD / Debug: top-left game state");
-        GUI.Label(new Rect(24f, 44f, 400f, 24f), $"Enemies awake: {AlertEnemyCount()}/{activeEnemies.Count}    Weapon pickups: {ActiveWeaponPickupCount()}");
-        GUI.Label(new Rect(24f, 68f, 400f, 24f), $"Salvage cores: {salvageCores}/3    Machines defeated: {defeatedMachines}");
-        GUI.Label(new Rect(24f, 92f, 400f, 24f), "Goal: clear rooms, upgrade weapons, defeat the breaker boss");
-        GUI.Label(new Rect(24f, 116f, 400f, 24f), "E = equip weapon    Mouse = aim/fire    R = purge heat");
+        GUI.Label(new Rect(24f, 20f, 480f, 24f), "HUD / Debug: top-left game state");
+        GUI.Label(new Rect(24f, 44f, 480f, 24f), $"Enemies awake: {AlertEnemyCount()}/{activeEnemies.Count}    Weapon pickups: {ActiveWeaponPickupCount()}");
+        GUI.Label(new Rect(24f, 68f, 480f, 24f), $"Salvage cores: {salvageCores}/3    Machines defeated: {defeatedMachines}");
+        GUI.Label(new Rect(24f, 92f, 480f, 24f), "Goal: clear rooms, upgrade weapons, defeat the breaker boss");
+        GUI.Label(new Rect(24f, 116f, 480f, 24f), "E equip    Mouse fire    Q Scrap Nova    F Magnetic Guard    R purge");
         GUI.color = previous;
     }
 
@@ -409,6 +409,8 @@ public class GameDirector : MonoBehaviour
     {
         EnemyController enemy = enemies.Get().GetComponent<EnemyController>();
         enemy.Configure(this, player, kind, position);
+        RoomDefinition homeRoom = GetCombatRoomForPosition(position);
+        enemy.SetHomeRoom(homeRoom.Center, homeRoom.Width, homeRoom.Height, homeRoom.Name);
         activeEnemies.Add(enemy);
         Debug.Log($"Gear Scavenger spawned {kind} enemy at {position}. Active enemies: {activeEnemies.Count}");
     }
@@ -524,6 +526,34 @@ public class GameDirector : MonoBehaviour
         }
 
         return GetFirstCombatRoom();
+    }
+
+    private RoomDefinition GetCombatRoomForPosition(Vector2 position)
+    {
+        Vector2Int rounded = Vector2Int.RoundToInt(position);
+        RoomDefinition nearest = GetFirstCombatRoom();
+        float nearestDistance = float.MaxValue;
+        foreach (RoomDefinition room in rooms)
+        {
+            if (!room.CombatRoom)
+            {
+                continue;
+            }
+
+            if (IsInsideRoom(room, rounded))
+            {
+                return room;
+            }
+
+            float distance = Vector2.SqrMagnitude(position - room.Center);
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearest = room;
+            }
+        }
+
+        return nearest;
     }
 
     private Vector2 PickCombatSpawnPoint(int seedOffset)
@@ -643,7 +673,13 @@ public class GameDirector : MonoBehaviour
             new WeaponStats("Rust Rifle", LoadSprite("weapon_rifle", DefaultWeaponSprite), 0.14f, 9.5f, 18, 13f, 3.5f, 1, 1.6f),
             new WeaponStats("Scatter Core", LoadSprite("weapon_scatter", DefaultWeaponSprite), 0.28f, 17f, 12, 11f, 12f, 5, 1.15f),
             new WeaponStats("Beam Needle", LoadSprite("weapon_beam", DefaultWeaponSprite), 0.08f, 6.5f, 9, 17f, 1.2f, 1, 1.25f),
-            new WeaponStats("Scrap Cannon", LoadSprite("weapon_cannon", DefaultWeaponSprite), 0.48f, 24f, 42, 9.5f, 4f, 1, 1.9f)
+            new WeaponStats("Scrap Cannon", LoadSprite("weapon_cannon", DefaultWeaponSprite), 0.48f, 24f, 42, 9.5f, 4f, 1, 1.9f),
+            new WeaponStats("Coil Ripper", LoadSprite("weapon_coil", SpriteFactory.Bolt(new Color(0.4f, 0.95f, 1f), new Color(0.02f, 0.18f, 0.28f))), 0.055f, 4.8f, 7, 18f, 5.5f, 1, 1.05f),
+            new WeaponStats("Arc Splitter", LoadSprite("weapon_arc", SpriteFactory.Diamond(new Color(0.95f, 0.75f, 1f), new Color(0.22f, 0.04f, 0.28f))), 0.24f, 15f, 14, 12f, 18f, 3, 1.35f),
+            new WeaponStats("Heat Lance", LoadSprite("weapon_lance", SpriteFactory.Bolt(new Color(1f, 0.35f, 0.12f), new Color(0.38f, 0.04f, 0.02f))), 0.68f, 34f, 70, 20f, 0.6f, 1, 1.1f),
+            new WeaponStats("Nanite Swarm", LoadSprite("weapon_swarm", SpriteFactory.Circle(new Color(0.35f, 1f, 0.5f), new Color(0.02f, 0.2f, 0.08f))), 0.18f, 11f, 8, 10f, 28f, 6, 1.65f),
+            new WeaponStats("Rail Spike", LoadSprite("weapon_rail", SpriteFactory.Bolt(new Color(0.95f, 0.98f, 1f), new Color(0.08f, 0.1f, 0.13f))), 0.38f, 20f, 52, 24f, 0.35f, 1, 1.35f),
+            new WeaponStats("Pulse Sprayer", LoadSprite("weapon_pulse", SpriteFactory.Circle(new Color(0.55f, 0.85f, 1f), new Color(0.02f, 0.08f, 0.24f))), 0.1f, 7.2f, 11, 14f, 15f, 2, 1.4f)
         };
     }
 
@@ -871,19 +907,19 @@ public class GameDirector : MonoBehaviour
 
     private void PlaceCrate(Transform root, int x, int y)
     {
-        GameObject crate = CreateBlockingProp(root, "Breakable Crate", x, y, 0.95f, CrateSprite, -2, new Vector2(0.82f, 0.82f));
+        GameObject crate = CreateBlockingProp(root, "Breakable Crate", x, y, 0.6f, CrateSprite, -2, new Vector2(0.38f, 0.38f));
         crate.AddComponent<DestructibleProp>().Configure(this, 36, 3, 0.08f, false);
     }
 
     private void PlaceBarrel(Transform root, int x, int y, bool volatileBarrel)
     {
-        GameObject barrel = CreateBlockingProp(root, volatileBarrel ? "Volatile Fuel Barrel" : "Scrap Barrel", x, y, 0.9f, BarrelSprite, -2, new Vector2(0.72f, 0.72f));
+        GameObject barrel = CreateBlockingProp(root, volatileBarrel ? "Volatile Fuel Barrel" : "Scrap Barrel", x, y, 0.58f, BarrelSprite, -2, new Vector2(0.42f, 0.42f));
         barrel.AddComponent<DestructibleProp>().Configure(this, volatileBarrel ? 28 : 34, volatileBarrel ? 4 : 2, volatileBarrel ? 0.14f : 0.04f, volatileBarrel);
     }
 
     private void PlaceTerminal(Transform root, int x, int y, string terminalName)
     {
-        GameObject terminal = CreateBlockingProp(root, terminalName, x, y, 1.05f, TerminalSprite, -2, new Vector2(0.72f, 0.72f));
+        GameObject terminal = CreateBlockingProp(root, terminalName, x, y, 0.72f, TerminalSprite, -2, new Vector2(0.46f, 0.46f));
         terminal.AddComponent<DestructibleProp>().Configure(this, 58, 5, 0.16f, false);
     }
 
@@ -905,7 +941,7 @@ public class GameDirector : MonoBehaviour
 
     private void PlaceDecoration(Transform root, int x, int y, float scale)
     {
-        CreateBlockingProp(root, "Scrap Machinery", x, y, scale, propSprites[Random.Range(0, propSprites.Length)], -2, Vector2.one * 0.8f);
+        CreateBlockingProp(root, "Scrap Machinery", x, y, scale * 0.62f, propSprites[Random.Range(0, propSprites.Length)], -2, Vector2.one * 0.42f);
     }
 
     private void RegisterBlockedCell(int x, int y)
@@ -1445,6 +1481,9 @@ public enum EnemyKind
 
 public class EnemyController : MonoBehaviour
 {
+    private const float PlayerRoomEntryMargin = -0.45f;
+    private const float EnemyRoomLeashMargin = -0.05f;
+
     private GameDirector director;
     private PlayerController player;
     private Rigidbody2D body;
@@ -1463,6 +1502,10 @@ public class EnemyController : MonoBehaviour
     private float supportPulseTimer;
     private float wakeDistance;
     private Vector2 spawnPosition;
+    private Vector2 homeCenter;
+    private int homeWidth = 10;
+    private int homeHeight = 8;
+    private string homeName = "Combat Room";
     private Color baseTint = Color.white;
     private bool active;
     private bool awakened;
@@ -1536,6 +1579,14 @@ public class EnemyController : MonoBehaviour
         healthBackRenderer.gameObject.SetActive(true);
         healthFillRenderer.gameObject.SetActive(true);
         RefreshHealthBar();
+    }
+
+    public void SetHomeRoom(Vector2 center, int width, int height, string roomName)
+    {
+        homeCenter = center;
+        homeWidth = Mathf.Max(1, width);
+        homeHeight = Mathf.Max(1, height);
+        homeName = string.IsNullOrEmpty(roomName) ? "Combat Room" : roomName;
     }
 
     private void EnsureVisuals()
@@ -1626,16 +1677,25 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        Vector2 toPlayer = player.transform.position - transform.position;
-        float distance = toPlayer.magnitude;
-        Vector2 direction = distance > 0.01f ? toPlayer / distance : Vector2.zero;
+        Vector2 enemyPosition = transform.position;
+        Vector2 playerPosition = player.transform.position;
+        bool playerInsideHome = IsInsideHomeRoom(playerPosition, PlayerRoomEntryMargin);
+        bool enemyInsideHome = IsInsideHomeRoom(enemyPosition, EnemyRoomLeashMargin);
+        Vector2 target = playerInsideHome && enemyInsideHome ? playerPosition : GetHomeAnchor(enemyPosition);
+        Vector2 toTarget = target - enemyPosition;
+        float distance = toTarget.magnitude;
+        Vector2 direction = distance > 0.01f ? toTarget / distance : Vector2.zero;
         float currentSpeed = IsSupported() ? speed * 1.35f : speed;
 
-        if (kind == EnemyKind.Drone && distance < 4.2f)
+        if (!playerInsideHome && distance < 0.45f)
+        {
+            body.velocity = Vector2.zero;
+        }
+        else if (kind == EnemyKind.Drone && playerInsideHome && distance < 4.2f)
         {
             body.velocity = -direction * currentSpeed * 0.65f;
         }
-        else if (kind == EnemyKind.Support && distance < 3.5f)
+        else if (kind == EnemyKind.Support && playerInsideHome && distance < 3.5f)
         {
             body.velocity = -direction * currentSpeed * 0.45f;
         }
@@ -1668,7 +1728,8 @@ public class EnemyController : MonoBehaviour
 
         contactTimer -= Time.deltaTime;
 
-        if (kind == EnemyKind.Drone || kind == EnemyKind.Boss)
+        bool playerInsideHome = IsInsideHomeRoom(player.transform.position, PlayerRoomEntryMargin);
+        if (playerInsideHome && (kind == EnemyKind.Drone || kind == EnemyKind.Boss))
         {
             shootTimer -= Time.deltaTime;
             if (shootTimer <= 0f)
@@ -1676,6 +1737,10 @@ public class EnemyController : MonoBehaviour
                 FireAtPlayer();
                 shootTimer = kind == EnemyKind.Boss ? 0.75f : 1.45f;
             }
+        }
+        else
+        {
+            shootTimer = Mathf.Min(shootTimer, 0.45f);
         }
 
         if (kind == EnemyKind.Support)
@@ -1746,7 +1811,7 @@ public class EnemyController : MonoBehaviour
 
         float playerDistance = Vector2.Distance(player.transform.position, transform.position);
         float spawnDistance = Vector2.Distance(player.transform.position, spawnPosition);
-        if (playerDistance <= wakeDistance || spawnDistance <= wakeDistance)
+        if (IsInsideHomeRoom(player.transform.position, PlayerRoomEntryMargin) && (playerDistance <= wakeDistance || spawnDistance <= wakeDistance))
         {
             WakeUp();
         }
@@ -1764,7 +1829,28 @@ public class EnemyController : MonoBehaviour
         shootTimer = Random.Range(0.35f, 0.9f);
         spriteRenderer.color = baseTint;
         markerRenderer.color = new Color(1f, 0.08f, 0.05f, 0.95f);
-        director?.ShowStatus($"{kind} machine awakened", 0.9f);
+        director?.ShowStatus($"{kind} machine awakened in {homeName}", 0.9f);
+    }
+
+    private bool IsInsideHomeRoom(Vector2 point, float margin)
+    {
+        float halfWidth = Mathf.Max(0.5f, homeWidth * 0.5f + margin);
+        float halfHeight = Mathf.Max(0.5f, homeHeight * 0.5f + margin);
+        return point.x >= homeCenter.x - halfWidth
+            && point.x <= homeCenter.x + halfWidth
+            && point.y >= homeCenter.y - halfHeight
+            && point.y <= homeCenter.y + halfHeight;
+    }
+
+    private Vector2 GetHomeAnchor(Vector2 enemyPosition)
+    {
+        float halfWidth = Mathf.Max(0.5f, homeWidth * 0.5f - 1.8f);
+        float halfHeight = Mathf.Max(0.5f, homeHeight * 0.5f - 1.8f);
+        Vector2 clamped = new Vector2(
+            Mathf.Clamp(enemyPosition.x, homeCenter.x - halfWidth, homeCenter.x + halfWidth),
+            Mathf.Clamp(enemyPosition.y, homeCenter.y - halfHeight, homeCenter.y + halfHeight));
+
+        return Vector2.Distance(clamped, enemyPosition) > 0.1f ? clamped : homeCenter;
     }
 
     private bool IsSupported()
@@ -1792,7 +1878,7 @@ public class EnemyController : MonoBehaviour
     private void OnCollisionStay2D(Collision2D collision)
     {
         PlayerController hitPlayer = collision.collider.GetComponent<PlayerController>();
-        if (hitPlayer != null && contactTimer <= 0f)
+        if (hitPlayer != null && contactTimer <= 0f && IsInsideHomeRoom(hitPlayer.transform.position, PlayerRoomEntryMargin))
         {
             WakeUp();
             hitPlayer.TakeDamage(kind == EnemyKind.Boss ? 18 : 10);
@@ -2116,7 +2202,7 @@ public class GameHud
         Image heatBack = CreatePanel(canvasObject.transform, "Heat Bar", Anchor.TopLeft, new Vector2(24f, -148f), new Vector2(260f, 18f), new Color(0.06f, 0.035f, 0.02f, 0.85f));
         Image heatFill = CreatePanel(heatBack.transform, "Heat Fill", Anchor.FillLeft, Vector2.zero, Vector2.zero, new Color(1f, 0.45f, 0.14f, 0.95f));
 
-        Text status = CreateText(canvasObject.transform, "Status", "WASD move  |  Mouse aim/fire  |  Space dash  |  R purge heat", 18, TextAnchor.LowerCenter);
+        Text status = CreateText(canvasObject.transform, "Status", "WASD move  |  Mouse fire  |  Space dash  |  Q Scrap Nova  |  F Magnetic Guard  |  R purge heat", 18, TextAnchor.LowerCenter);
         status.rectTransform.anchorMin = new Vector2(0f, 0f);
         status.rectTransform.anchorMax = new Vector2(1f, 0f);
         status.rectTransform.anchoredPosition = new Vector2(0f, 34f);
@@ -2135,7 +2221,7 @@ public class GameHud
 
         int cores = director != null ? director.SalvageCores : 0;
         int kills = director != null ? director.DefeatedMachines : 0;
-        statsText.text = $"Armor {player.Armor}/{player.MaxArmor}   Heat {Mathf.RoundToInt(player.Heat)}%   Scrap {player.Scrap}   Cores {cores}/3   Kills {kills}   Weapon {player.WeaponName}   Wave {wave}/5   Awake {awakeEnemyCount}/{totalEnemyCount}   Pickups {pickupCount}";
+        statsText.text = $"Armor {player.Armor}/{player.MaxArmor}   Heat {Mathf.RoundToInt(player.Heat)}%   Scrap {player.Scrap}   Nova {player.NovaScrapCost}   Guard {player.GuardScrapCost}   Cores {cores}/3   Kills {kills}   Weapon {player.WeaponName}   Wave {wave}/5   Awake {awakeEnemyCount}/{totalEnemyCount}   Pickups {pickupCount}";
 
         if (damageFlash > 0f)
         {

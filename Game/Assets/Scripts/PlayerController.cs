@@ -22,6 +22,16 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float purgeRadius = 3.1f;
     [SerializeField] private int purgeDamage = 36;
     [SerializeField] private float purgeKnockback = 9f;
+    [SerializeField] private int novaScrapCost = 10;
+    [SerializeField] private float novaRadius = 4.2f;
+    [SerializeField] private int novaDamage = 58;
+    [SerializeField] private float novaKnockback = 13f;
+    [SerializeField] private float novaHeatBonus = 22f;
+    [SerializeField] private int guardScrapCost = 6;
+    [SerializeField] private float guardDuration = 4.5f;
+    [SerializeField] private int guardArmorRepair = 16;
+    [SerializeField] private float guardHeatCooling = 26f;
+    [SerializeField] private float guardDamageReduction = 0.55f;
 
     private Rigidbody2D body;
     private SpriteRenderer spriteRenderer;
@@ -32,6 +42,7 @@ public class PlayerController : MonoBehaviour
     private Vector2 aimDirection = Vector2.right;
     private float dashTimer;
     private float nextDashTime;
+    private float guardTimer;
     private WeaponPickup nearbyWeapon;
     private int armor;
     private int scrap;
@@ -47,6 +58,8 @@ public class PlayerController : MonoBehaviour
     public Vector2 AimDirection => aimDirection;
     public bool IsDead => dead;
     public string WeaponName => weapon != null ? weapon.CurrentWeaponName : "None";
+    public int NovaScrapCost => novaScrapCost;
+    public int GuardScrapCost => guardScrapCost;
 
     public void SetBodyRenderer(SpriteRenderer bodyRenderer)
     {
@@ -86,6 +99,7 @@ public class PlayerController : MonoBehaviour
 
         ReadMovement();
         ReadAim();
+        TickSkillState();
         CoolHeat();
         PullScrapIn();
         CheckWeaponPickup();
@@ -104,6 +118,16 @@ public class PlayerController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.R) && Heat >= purgeHeatCost * 0.55f)
         {
             Purge();
+        }
+
+        if (Input.GetKeyDown(KeyCode.Q))
+        {
+            ScrapNova();
+        }
+
+        if (Input.GetKeyDown(KeyCode.F))
+        {
+            MagneticGuard();
         }
 
         if (nearbyWeapon != null && Input.GetKeyDown(KeyCode.E))
@@ -153,7 +177,8 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        armor = Mathf.Max(0, armor - amount);
+        int finalDamage = guardTimer > 0f ? Mathf.Max(1, Mathf.RoundToInt(amount * (1f - guardDamageReduction))) : amount;
+        armor = Mathf.Max(0, armor - finalDamage);
         director.FlashDamage();
         if (armor <= 0)
         {
@@ -271,6 +296,76 @@ public class PlayerController : MonoBehaviour
             {
                 enemy.TakeDamage(purgeDamage, offset.normalized * purgeKnockback);
             }
+        }
+    }
+
+    private void ScrapNova()
+    {
+        if (scrap < novaScrapCost)
+        {
+            director.ShowStatus($"Need {novaScrapCost} scrap to release Scrap Nova", 1.2f);
+            return;
+        }
+
+        scrap -= novaScrapCost;
+        Heat = Mathf.Min(maxHeat, Heat + novaHeatBonus);
+        if (Heat >= maxHeat)
+        {
+            overheated = true;
+        }
+
+        director.PlayPurgeEffect(transform.position, novaRadius);
+        EnemyController[] enemies = FindObjectsOfType<EnemyController>();
+        foreach (EnemyController enemy in enemies)
+        {
+            if (!enemy.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            Vector2 offset = enemy.transform.position - transform.position;
+            float distance = offset.magnitude;
+            if (distance <= novaRadius)
+            {
+                float falloff = Mathf.Lerp(1f, 0.45f, distance / novaRadius);
+                enemy.TakeDamage(Mathf.RoundToInt(novaDamage * falloff), offset.normalized * novaKnockback);
+            }
+        }
+
+        director.ShowStatus("Scrap Nova released: parts shockwave discharged", 1.6f);
+    }
+
+    private void MagneticGuard()
+    {
+        if (scrap < guardScrapCost)
+        {
+            director.ShowStatus($"Need {guardScrapCost} scrap to activate Magnetic Guard", 1.2f);
+            return;
+        }
+
+        scrap -= guardScrapCost;
+        guardTimer = guardDuration;
+        armor = Mathf.Min(maxArmor, armor + guardArmorRepair);
+        Heat = Mathf.Max(0f, Heat - guardHeatCooling);
+        if (overheated && Heat <= overheatRecoveryHeat)
+        {
+            overheated = false;
+        }
+
+        director.PlayPurgeEffect(transform.position, 2.2f);
+        director.ShowStatus("Magnetic Guard online: armor repaired and damage reduced", 1.6f);
+    }
+
+    private void TickSkillState()
+    {
+        if (guardTimer > 0f)
+        {
+            guardTimer = Mathf.Max(0f, guardTimer - Time.deltaTime);
+        }
+
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = guardTimer > 0f ? new Color(0.64f, 1f, 0.95f, 1f) : Color.white;
         }
     }
 

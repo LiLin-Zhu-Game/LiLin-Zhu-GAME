@@ -226,18 +226,18 @@ public static class GearScavengerEditorPreview
 
     private static void AddCrate(Transform root, int x, int y)
     {
-        AddPreviewProp(root, "Preview Breakable Crate", new Vector3(x, y, -0.05f), Vector3.one * 0.82f, PreviewSpriteCache.Square, new Color(0.56f, 0.38f, 0.18f, 0.95f));
+        AddPreviewProp(root, "Preview Breakable Crate", new Vector3(x, y, -0.05f), Vector3.one * 0.6f, PreviewSpriteCache.Square, new Color(0.56f, 0.38f, 0.18f, 0.95f));
     }
 
     private static void AddBarrel(Transform root, int x, int y, bool volatileBarrel)
     {
         Color color = volatileBarrel ? new Color(0.9f, 0.2f, 0.1f, 0.95f) : new Color(0.55f, 0.34f, 0.24f, 0.95f);
-        AddPreviewProp(root, volatileBarrel ? "Preview Fuel Barrel" : "Preview Scrap Barrel", new Vector3(x, y, -0.06f), Vector3.one * 0.72f, PreviewSpriteCache.Circle, color);
+        AddPreviewProp(root, volatileBarrel ? "Preview Fuel Barrel" : "Preview Scrap Barrel", new Vector3(x, y, -0.06f), Vector3.one * 0.58f, PreviewSpriteCache.Circle, color);
     }
 
     private static void AddTerminal(Transform root, int x, int y, string name)
     {
-        AddPreviewProp(root, name, new Vector3(x, y, -0.07f), Vector3.one * 0.9f, PreviewSpriteCache.Diamond, new Color(0.15f, 0.95f, 0.66f, 0.96f));
+        AddPreviewProp(root, name, new Vector3(x, y, -0.07f), Vector3.one * 0.72f, PreviewSpriteCache.Diamond, new Color(0.15f, 0.95f, 0.66f, 0.96f));
     }
 
     private static void AddDormantEnemy(Transform root, int x, int y)
