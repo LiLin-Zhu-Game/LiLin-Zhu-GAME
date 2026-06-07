@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -21,6 +22,13 @@ public class GearScavengerBootstrapper
 
 public class GameDirector : MonoBehaviour
 {
+    private enum GameMode
+    {
+        Story,
+        Challenge,
+        Training
+    }
+
     private struct RoomDefinition
     {
         public Vector2 Center;
@@ -49,11 +57,16 @@ public class GameDirector : MonoBehaviour
     private Sprite[] floorSprites;
     private Sprite[] propSprites;
     private WeaponStats[] weaponTable;
+    private GameObject mainMenuCanvas;
+    private GameObject tutorialPanel;
+    private Text modeDescriptionText;
+    private GameMode selectedMode = GameMode.Story;
     private int wave;
     private int salvageCores;
     private int defeatedMachines;
     private int roomsCleared;
     private bool gameOver;
+    private bool gameStarted;
     private float statusTimer;
 
     public Sprite FloorSprite { get; private set; }
@@ -83,19 +96,57 @@ public class GameDirector : MonoBehaviour
         BuildSprites();
         ConfigureCamera();
         RemoveEditorPreviewMap();
+        CreateMainMenu();
+    }
+
+    private void StartGameSession()
+    {
+        if (gameStarted)
+        {
+            return;
+        }
+
+        gameStarted = true;
+        if (mainMenuCanvas != null)
+        {
+            Destroy(mainMenuCanvas);
+            mainMenuCanvas = null;
+        }
+
+        wave = 0;
+        salvageCores = 0;
+        defeatedMachines = 0;
+        roomsCleared = 0;
+        gameOver = false;
+        statusTimer = 0f;
         BuildLevel();
         BuildPools();
         SpawnPlayer();
         SpawnStarterWeaponDrops();
+        if (selectedMode == GameMode.Training)
+        {
+            SpawnRoomWeaponDrops(2);
+        }
+
         SpawnGuaranteedRoomEnemies();
+        if (selectedMode == GameMode.Challenge)
+        {
+            SpawnExtraWavePressure(3);
+        }
+
         ValidateStartupSpawns();
         CreateHudSafely();
-        ShowStatus($"Objective: clear rooms, collect 3 salvage cores, then survive the boss.", 4f);
+        ShowStatus(GetModeStartMessage(), 4f);
         StartCoroutine(WaveRoutine());
     }
 
     private void Update()
     {
+        if (!gameStarted)
+        {
+            return;
+        }
+
         hud?.Refresh(wave, AlertEnemyCount(), activeEnemies.Count);
 
         if (statusTimer > 0f)
@@ -115,6 +166,11 @@ public class GameDirector : MonoBehaviour
 
     private void OnGUI()
     {
+        if (!gameStarted)
+        {
+            return;
+        }
+
         Color previous = GUI.color;
         Rect panel = new Rect(12f, 12f, 520f, 132f);
         GUI.color = new Color(0f, 0f, 0f, 0.72f);
@@ -126,6 +182,274 @@ public class GameDirector : MonoBehaviour
         GUI.Label(new Rect(24f, 92f, 480f, 24f), "Goal: clear rooms, upgrade weapons, defeat the breaker boss");
         GUI.Label(new Rect(24f, 116f, 480f, 24f), "E equip    Mouse fire    Q Scrap Nova    F Magnetic Guard    R purge");
         GUI.color = previous;
+    }
+
+    private void CreateMainMenu()
+    {
+        EnsureEventSystem();
+
+        mainMenuCanvas = new GameObject("Gear Scavenger Main Menu");
+        Canvas canvas = mainMenuCanvas.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        CanvasScaler scaler = mainMenuCanvas.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1280f, 720f);
+        scaler.matchWidthOrHeight = 0.5f;
+        mainMenuCanvas.AddComponent<GraphicRaycaster>();
+
+        Image background = CreateMenuImage(mainMenuCanvas.transform, "Wasteland Background", Color.clear);
+        Stretch(background.rectTransform);
+        background.color = new Color(0.035f, 0.045f, 0.05f, 1f);
+
+        Image floorBand = CreateMenuImage(mainMenuCanvas.transform, "Workshop Floor Band", new Color(0.09f, 0.12f, 0.11f, 1f));
+        floorBand.rectTransform.anchorMin = new Vector2(0f, 0f);
+        floorBand.rectTransform.anchorMax = new Vector2(1f, 0.36f);
+        floorBand.rectTransform.offsetMin = Vector2.zero;
+        floorBand.rectTransform.offsetMax = Vector2.zero;
+
+        CreateMenuDecoration(mainMenuCanvas.transform, new Vector2(-360f, -246f), new Vector2(430f, 16f), new Color(0.34f, 0.21f, 0.12f, 0.85f), -8f);
+        CreateMenuDecoration(mainMenuCanvas.transform, new Vector2(340f, -242f), new Vector2(430f, 16f), new Color(0.24f, 0.36f, 0.35f, 0.85f), 8f);
+        CreateMenuDecoration(mainMenuCanvas.transform, new Vector2(0f, -286f), new Vector2(720f, 10f), new Color(0.55f, 0.18f, 0.1f, 0.55f), 0f);
+
+        Text title = CreateMenuText(mainMenuCanvas.transform, "Title", "GEAR SCAVENGER", 56, TextAnchor.MiddleCenter, new Color(0.68f, 1f, 0.94f));
+        title.rectTransform.anchorMin = new Vector2(0.5f, 1f);
+        title.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+        title.rectTransform.anchoredPosition = new Vector2(0f, -62f);
+        title.rectTransform.sizeDelta = new Vector2(900f, 78f);
+
+        Text subtitle = CreateMenuText(mainMenuCanvas.transform, "Subtitle", "Rebuild a scavenger robot, raid ruined machine rooms, and survive the breaker core.", 22, TextAnchor.MiddleCenter, new Color(0.86f, 0.92f, 0.9f));
+        subtitle.rectTransform.anchorMin = new Vector2(0.5f, 1f);
+        subtitle.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+        subtitle.rectTransform.anchoredPosition = new Vector2(0f, -116f);
+        subtitle.rectTransform.sizeDelta = new Vector2(980f, 42f);
+
+        Image modePanel = CreateMenuImage(mainMenuCanvas.transform, "Mode Panel", new Color(0.018f, 0.03f, 0.034f, 0.94f));
+        modePanel.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        modePanel.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        modePanel.rectTransform.anchoredPosition = new Vector2(-250f, -48f);
+        modePanel.rectTransform.sizeDelta = new Vector2(430f, 370f);
+
+        Text modeTitle = CreateMenuText(modePanel.transform, "Mode Title", "SELECT MODE", 30, TextAnchor.MiddleCenter, new Color(1f, 0.86f, 0.52f));
+        modeTitle.rectTransform.anchorMin = new Vector2(0f, 1f);
+        modeTitle.rectTransform.anchorMax = new Vector2(1f, 1f);
+        modeTitle.rectTransform.anchoredPosition = new Vector2(0f, -38f);
+        modeTitle.rectTransform.sizeDelta = new Vector2(-40f, 42f);
+
+        CreateModeButton(modePanel.transform, "Story Mode", "Balanced mission", new Vector2(215f, -102f), GameMode.Story);
+        CreateModeButton(modePanel.transform, "Challenge Mode", "More enemies, faster pressure", new Vector2(215f, -172f), GameMode.Challenge);
+        CreateModeButton(modePanel.transform, "Training Mode", "Extra weapon drops for practice", new Vector2(215f, -242f), GameMode.Training);
+
+        modeDescriptionText = CreateMenuText(modePanel.transform, "Mode Description", "", 20, TextAnchor.UpperLeft, new Color(0.86f, 0.94f, 0.9f));
+        modeDescriptionText.rectTransform.anchorMin = new Vector2(0f, 0f);
+        modeDescriptionText.rectTransform.anchorMax = new Vector2(1f, 0f);
+        modeDescriptionText.rectTransform.anchoredPosition = new Vector2(0f, 46f);
+        modeDescriptionText.rectTransform.sizeDelta = new Vector2(-54f, 64f);
+        modeDescriptionText.rectTransform.offsetMin = new Vector2(28f, modeDescriptionText.rectTransform.offsetMin.y);
+        modeDescriptionText.rectTransform.offsetMax = new Vector2(-28f, modeDescriptionText.rectTransform.offsetMax.y);
+        UpdateModeDescription();
+
+        Image actionPanel = CreateMenuImage(mainMenuCanvas.transform, "Action Panel", new Color(0.018f, 0.03f, 0.034f, 0.94f));
+        actionPanel.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        actionPanel.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        actionPanel.rectTransform.anchoredPosition = new Vector2(250f, -48f);
+        actionPanel.rectTransform.sizeDelta = new Vector2(430f, 370f);
+
+        Text brief = CreateMenuText(actionPanel.transform, "Briefing", "MISSION BRIEFING\n\nCollect salvage cores, swap weapons from room drops, use scrap to trigger robot abilities, then break through the final vault.", 23, TextAnchor.UpperLeft, new Color(0.92f, 0.96f, 0.94f));
+        brief.rectTransform.anchorMin = new Vector2(0f, 1f);
+        brief.rectTransform.anchorMax = new Vector2(1f, 1f);
+        brief.rectTransform.anchoredPosition = new Vector2(0f, -118f);
+        brief.rectTransform.sizeDelta = new Vector2(-56f, 190f);
+
+        CreateMenuButton(actionPanel.transform, "START GAME", new Vector2(215f, -244f), new Vector2(350f, 62f), new Color(0.1f, 0.62f, 0.56f, 0.96f), StartGameSession);
+        CreateMenuButton(actionPanel.transform, "TUTORIAL", new Vector2(144f, -318f), new Vector2(190f, 52f), new Color(0.22f, 0.28f, 0.33f, 0.96f), ShowTutorial);
+        CreateMenuButton(actionPanel.transform, "QUIT", new Vector2(320f, -318f), new Vector2(120f, 52f), new Color(0.34f, 0.16f, 0.14f, 0.96f), QuitGame);
+
+        CreateTutorialPanel();
+    }
+
+    private void EnsureEventSystem()
+    {
+        if (FindObjectOfType<EventSystem>() != null)
+        {
+            return;
+        }
+
+        GameObject eventSystem = new GameObject("EventSystem");
+        eventSystem.AddComponent<EventSystem>();
+        eventSystem.AddComponent<StandaloneInputModule>();
+    }
+
+    private void CreateModeButton(Transform parent, string title, string subtitle, Vector2 position, GameMode mode)
+    {
+        Button button = CreateMenuButton(parent, title, position, new Vector2(354f, 52f), new Color(0.1f, 0.18f, 0.2f, 0.96f), () =>
+        {
+            selectedMode = mode;
+            UpdateModeDescription();
+        });
+
+        Text label = button.GetComponentInChildren<Text>();
+        if (label != null)
+        {
+            label.text = $"{title}\n{subtitle}";
+            label.fontSize = 18;
+            label.alignment = TextAnchor.MiddleLeft;
+            label.rectTransform.offsetMin = new Vector2(20f, 0f);
+            label.rectTransform.offsetMax = new Vector2(-14f, 0f);
+        }
+    }
+
+    private Button CreateMenuButton(Transform parent, string label, Vector2 position, Vector2 size, Color color, UnityEngine.Events.UnityAction action)
+    {
+        GameObject obj = new GameObject(label);
+        obj.transform.SetParent(parent, false);
+        Image image = obj.AddComponent<Image>();
+        image.color = color;
+        Button button = obj.AddComponent<Button>();
+        ColorBlock colors = button.colors;
+        colors.normalColor = color;
+        colors.highlightedColor = new Color(Mathf.Min(color.r + 0.14f, 1f), Mathf.Min(color.g + 0.14f, 1f), Mathf.Min(color.b + 0.14f, 1f), color.a);
+        colors.pressedColor = new Color(color.r * 0.72f, color.g * 0.72f, color.b * 0.72f, color.a);
+        button.colors = colors;
+        button.onClick.AddListener(action);
+
+        RectTransform rect = image.rectTransform;
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+
+        Text text = CreateMenuText(obj.transform, "Label", label, 22, TextAnchor.MiddleCenter, Color.white);
+        Stretch(text.rectTransform);
+        return button;
+    }
+
+    private void CreateTutorialPanel()
+    {
+        tutorialPanel = new GameObject("Tutorial Panel");
+        tutorialPanel.transform.SetParent(mainMenuCanvas.transform, false);
+
+        Image shade = tutorialPanel.AddComponent<Image>();
+        shade.color = new Color(0f, 0f, 0f, 0.72f);
+        Stretch(shade.rectTransform);
+
+        Image panel = CreateMenuImage(tutorialPanel.transform, "Tutorial Content", new Color(0.025f, 0.035f, 0.04f, 0.98f));
+        panel.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        panel.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        panel.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        panel.rectTransform.anchoredPosition = Vector2.zero;
+        panel.rectTransform.sizeDelta = new Vector2(700f, 500f);
+
+        Text title = CreateMenuText(panel.transform, "Tutorial Title", "HOW TO PLAY", 34, TextAnchor.MiddleCenter, new Color(1f, 0.86f, 0.52f));
+        title.rectTransform.anchorMin = new Vector2(0f, 1f);
+        title.rectTransform.anchorMax = new Vector2(1f, 1f);
+        title.rectTransform.anchoredPosition = new Vector2(0f, -48f);
+        title.rectTransform.sizeDelta = new Vector2(-70f, 50f);
+
+        string tutorial = "WASD: move the robot\nMouse: aim and fire\nSpace: dash through danger\nE: equip nearby weapon drops\nQ: spend 10 scrap to release Scrap Nova\nF: spend 6 scrap for Magnetic Guard\nR: purge weapon heat\n\nClear combat rooms, collect salvage cores, destroy crates for scrap, and defeat the breaker boss.";
+        Text body = CreateMenuText(panel.transform, "Tutorial Body", tutorial, 23, TextAnchor.UpperLeft, new Color(0.9f, 0.96f, 0.95f));
+        body.rectTransform.anchorMin = new Vector2(0f, 0f);
+        body.rectTransform.anchorMax = new Vector2(1f, 1f);
+        body.rectTransform.offsetMin = new Vector2(54f, 82f);
+        body.rectTransform.offsetMax = new Vector2(-54f, -92f);
+
+        CreateMenuButton(panel.transform, "BACK", new Vector2(350f, -452f), new Vector2(220f, 50f), new Color(0.18f, 0.3f, 0.32f, 0.96f), HideTutorial);
+        tutorialPanel.SetActive(false);
+    }
+
+    private void ShowTutorial()
+    {
+        tutorialPanel?.SetActive(true);
+    }
+
+    private void HideTutorial()
+    {
+        tutorialPanel?.SetActive(false);
+    }
+
+    private void QuitGame()
+    {
+#if UNITY_EDITOR
+        Debug.Log("Quit button pressed. Application.Quit only exits a built player.");
+#else
+        Application.Quit();
+#endif
+    }
+
+    private void UpdateModeDescription()
+    {
+        if (modeDescriptionText == null)
+        {
+            return;
+        }
+
+        switch (selectedMode)
+        {
+            case GameMode.Challenge:
+                modeDescriptionText.text = "Challenge Mode: extra pressure spawns at the start. Best for showing combat and weapon variety quickly.";
+                break;
+            case GameMode.Training:
+                modeDescriptionText.text = "Training Mode: extra weapons spawn near the start so you can test guns and abilities before harder fights.";
+                break;
+            default:
+                modeDescriptionText.text = "Story Mode: balanced room clearing, salvage rewards, and final boss progression.";
+                break;
+        }
+    }
+
+    private string GetModeStartMessage()
+    {
+        switch (selectedMode)
+        {
+            case GameMode.Challenge:
+                return "Challenge Mode: survive heavier machine pressure and secure the breaker core.";
+            case GameMode.Training:
+                return "Training Mode: test weapons, learn scrap skills, then clear the ruin.";
+            default:
+                return "Story Mode: clear rooms, collect 3 salvage cores, then survive the boss.";
+        }
+    }
+
+    private static Image CreateMenuImage(Transform parent, string name, Color color)
+    {
+        GameObject obj = new GameObject(name);
+        obj.transform.SetParent(parent, false);
+        Image image = obj.AddComponent<Image>();
+        image.color = color;
+        return image;
+    }
+
+    private static Text CreateMenuText(Transform parent, string name, string content, int size, TextAnchor alignment, Color color)
+    {
+        GameObject obj = new GameObject(name);
+        obj.transform.SetParent(parent, false);
+        Text text = obj.AddComponent<Text>();
+        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.fontSize = size;
+        text.alignment = alignment;
+        text.text = content;
+        text.color = color;
+        text.horizontalOverflow = HorizontalWrapMode.Wrap;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+        return text;
+    }
+
+    private static void CreateMenuDecoration(Transform parent, Vector2 position, Vector2 size, Color color, float rotation)
+    {
+        Image image = CreateMenuImage(parent, "Menu Scrap Accent", color);
+        image.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        image.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        image.rectTransform.anchoredPosition = position;
+        image.rectTransform.sizeDelta = size;
+        image.rectTransform.rotation = Quaternion.Euler(0f, 0f, rotation);
+    }
+
+    private static void Stretch(RectTransform rect)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
     }
 
     public Bullet GetPlayerBullet()
