@@ -1,0 +1,36 @@
+name: Bug Report
+description: Report a reproducible Gear Scavenger defect
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: completion
+    attributes:
+      label: Completion criteria
+      value: |
+        - [ ] Root cause identified
+        - [ ] Fix verified in Unity Play Mode
+        - [ ] Regression check completed

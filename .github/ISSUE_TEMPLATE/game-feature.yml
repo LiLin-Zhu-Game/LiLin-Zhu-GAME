@@ -1,0 +1,47 @@
+name: Game Feature
+description: Plan a player-facing Gear Scavenger feature
+title: "[Feature] "
+labels:
+  - feature
+body:
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Must-have
+        - Should-have
+        - Could-have
+        - Cut-first
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Player outcome
+      description: Describe what changes for the player when this issue is complete.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: List the concrete implementation work included in this issue.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Use a checklist of observable completion conditions.
+      value: |
+        - [ ] Works in the five-minute vertical slice
+        - [ ] Does not break movement, shooting, heat, or enemy spawning
+        - [ ] Tested in Unity Play Mode
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Add screenshots, video, commit, or test notes when closing.

@@ -31,3 +31,20 @@
 .dotnet/
 Game/Assets/ResourcesPreview/
 Game/Assets/ResourcesPreview.meta
+
+# Third-party source packages and working art files are local-only.
+# Commit license notes and approved runtime sprites separately.
+Game/Assets/ArtCandidates/**/SourcePackage/
+Game/Assets/ArtCandidates/**/Working/
+Game/Assets/ArtCandidates/**/Prepared/
+Game/Assets/ArtCandidates/**/SourcePackage.meta
+Game/Assets/ArtCandidates/**/Working.meta
+Game/Assets/ArtCandidates/**/Prepared.meta
+Game/Assets/ArtCandidates/Monkeystein_Enemies/
+Game/Assets/ArtCandidates/Monkeystein_Enemies.meta
+Game/Assets/ArtCandidates/**/*.zip
+Game/Assets/ArtCandidates/**/*.rar
+Game/Assets/ArtCandidates/**/*.7z
+Game/Assets/ArtCandidates/**/*.zip.meta
+Game/Assets/ArtCandidates/**/*.rar.meta
+Game/Assets/ArtCandidates/**/*.7z.meta

@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -88,6 +89,7 @@ public class GameDirector : MonoBehaviour
     public int SalvageCores => salvageCores;
     public int DefeatedMachines => defeatedMachines;
     public int RoomsCleared => roomsCleared;
+    public bool UsingCandidateArt { get; private set; }
 
     private void Start()
     {
@@ -1009,6 +1011,13 @@ public class GameDirector : MonoBehaviour
 
     private Sprite LoadSprite(string assetName, Sprite fallback)
     {
+        Sprite candidate = LoadCandidateSprite(assetName);
+        if (candidate != null)
+        {
+            UsingCandidateArt = true;
+            return candidate;
+        }
+
         Sprite loaded = Resources.Load<Sprite>($"GearScavenger/{assetName}");
         if (loaded != null)
         {
@@ -1021,6 +1030,28 @@ public class GameDirector : MonoBehaviour
             return fallback;
         }
 
+        return Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), Mathf.Max(texture.width, texture.height));
+    }
+
+    private Sprite LoadCandidateSprite(string assetName)
+    {
+        string candidatePath = Path.Combine(Application.dataPath, "ArtCandidates", "PreparedRuntime", $"{assetName}.png");
+        if (!File.Exists(candidatePath))
+        {
+            return null;
+        }
+
+        byte[] bytes = File.ReadAllBytes(candidatePath);
+        Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+        if (!texture.LoadImage(bytes))
+        {
+            Destroy(texture);
+            return null;
+        }
+
+        texture.name = $"Candidate {assetName}";
+        texture.filterMode = FilterMode.Point;
+        texture.wrapMode = TextureWrapMode.Clamp;
         return Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), Mathf.Max(texture.width, texture.height));
     }
 
@@ -1460,7 +1491,7 @@ public class GameDirector : MonoBehaviour
         bodyRenderer.sortingOrder = 5;
         bodyTransform.localPosition = new Vector3(0f, -0.02f, 0f);
         bodyTransform.localRotation = Quaternion.identity;
-        bodyTransform.localScale = Vector3.one * 3.85f;
+        bodyTransform.localScale = Vector3.one * (UsingCandidateArt ? 1.15f : 3.85f);
 
         Rigidbody2D rb = playerObject.GetComponent<Rigidbody2D>();
         if (rb == null)
@@ -1864,7 +1895,7 @@ public class EnemyController : MonoBehaviour
                 health = maxHealth = 52;
                 speed = 3.15f;
                 spriteRenderer.sprite = director.ChaserSprite;
-                spriteRenderer.transform.localScale = Vector3.one * 2.75f;
+                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 1.05f : 2.75f);
                 baseTint = new Color(1f, 0.92f, 0.9f, 1f);
                 healthBarWidth = 0.95f;
                 break;
@@ -1872,7 +1903,7 @@ public class EnemyController : MonoBehaviour
                 health = maxHealth = 42;
                 speed = 2.1f;
                 spriteRenderer.sprite = director.DroneSprite;
-                spriteRenderer.transform.localScale = Vector3.one * 2.55f;
+                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 0.95f : 2.55f);
                 baseTint = new Color(0.95f, 0.98f, 1f, 1f);
                 healthBarWidth = 0.9f;
                 break;
@@ -1880,7 +1911,7 @@ public class EnemyController : MonoBehaviour
                 health = maxHealth = 64;
                 speed = 1.9f;
                 spriteRenderer.sprite = director.SupportSprite;
-                spriteRenderer.transform.localScale = Vector3.one * 2.65f;
+                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 1.1f : 2.65f);
                 baseTint = new Color(0.88f, 1f, 0.9f, 1f);
                 healthBarWidth = 1f;
                 break;
@@ -1888,7 +1919,7 @@ public class EnemyController : MonoBehaviour
                 health = maxHealth = 240;
                 speed = 2f;
                 spriteRenderer.sprite = director.BossSprite;
-                spriteRenderer.transform.localScale = Vector3.one * 3.7f;
+                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 1.8f : 3.7f);
                 baseTint = new Color(1f, 0.88f, 0.86f, 1f);
                 healthBarWidth = 1.45f;
                 break;
