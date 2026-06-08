@@ -17,6 +17,7 @@ third-party runtime sprites.
 | Robot's Last Stand | Ninbax_303 | https://ninbax-303.itch.io/robots-last-stand-asset-pack | Backup enemies and projectiles | Selected backup, free, CC0 |
 | Mechs Assets free pack | MarineSosa | https://marinesosa.itch.io/mech-assets | Boss and heavy enemies | Static boss prepared, free tier available |
 | Top Down Robot Enemies | Dr. Monkeystein | https://drmonkeystein.itch.io/top-down-robot-enemies | Earlier enemy reference | Not selected, paid |
+| Mechanical wasteland map and weapons | Gear Scavenger project | Project-created candidate art | Floor, walls, props, and modular weapons | Static preview prepared |
 
 ## Runtime filename contract
 

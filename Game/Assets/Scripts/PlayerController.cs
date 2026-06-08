@@ -43,6 +43,8 @@ public class PlayerController : MonoBehaviour
     private float dashTimer;
     private float nextDashTime;
     private float guardTimer;
+    private float overdriveTimer;
+    private float heatGainMultiplier = 1f;
     private WeaponPickup nearbyWeapon;
     private int armor;
     private int scrap;
@@ -60,6 +62,7 @@ public class PlayerController : MonoBehaviour
     public string WeaponName => weapon != null ? weapon.CurrentWeaponName : "None";
     public int NovaScrapCost => novaScrapCost;
     public int GuardScrapCost => guardScrapCost;
+    public float FireDelayMultiplier => overdriveTimer > 0f ? 0.72f : 1f;
 
     public void SetBodyRenderer(SpriteRenderer bodyRenderer)
     {
@@ -74,6 +77,8 @@ public class PlayerController : MonoBehaviour
         armor = maxArmor;
         scrap = 0;
         Heat = 0f;
+        heatGainMultiplier = 1f;
+        overdriveTimer = 0f;
         overheated = false;
         dead = false;
     }
@@ -145,7 +150,8 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        Vector2 velocity = moveInput * moveSpeed;
+        float currentMoveSpeed = overdriveTimer > 0f ? moveSpeed * 1.25f : moveSpeed;
+        Vector2 velocity = moveInput * currentMoveSpeed;
         if (dashTimer > 0f)
         {
             velocity = moveInput.normalized * dashForce;
@@ -162,7 +168,7 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        Heat = Mathf.Clamp(Heat + amount, 0f, maxHeat);
+        Heat = Mathf.Clamp(Heat + amount * heatGainMultiplier, 0f, maxHeat);
         if (Heat >= maxHeat)
         {
             overheated = true;
@@ -226,6 +232,32 @@ public class PlayerController : MonoBehaviour
 
         weapon.ApplyWeapon(stats);
         director.ShowStatus($"Equipped {stats.Name}", 2f);
+    }
+
+    public void ApplyRoomSkill(RoomSkillType skillType)
+    {
+        switch (skillType)
+        {
+            case RoomSkillType.KineticOverdrive:
+                overdriveTimer = Mathf.Max(overdriveTimer, 24f);
+                director.ShowStatus("Kinetic Overdrive: movement and fire rate boosted for 24 seconds", 2.4f);
+                break;
+            case RoomSkillType.CoolantMatrix:
+                heatGainMultiplier = Mathf.Max(0.55f, heatGainMultiplier * 0.78f);
+                CoolWeapon(maxHeat);
+                director.ShowStatus("Coolant Matrix installed: shots permanently generate less heat", 2.4f);
+                break;
+            case RoomSkillType.NaniteShell:
+                maxArmor += 25;
+                armor = Mathf.Min(maxArmor, armor + 45);
+                director.ShowStatus("Nanite Shell installed: maximum armor increased by 25", 2.4f);
+                break;
+            default:
+                scrapPickupRadius += 0.9f;
+                AddScrap(8);
+                director.ShowStatus("Salvage Magnet installed: pickup range increased and 8 scrap recovered", 2.4f);
+                break;
+        }
     }
 
     private void ReadMovement()
@@ -358,6 +390,11 @@ public class PlayerController : MonoBehaviour
 
     private void TickSkillState()
     {
+        if (overdriveTimer > 0f)
+        {
+            overdriveTimer = Mathf.Max(0f, overdriveTimer - Time.deltaTime);
+        }
+
         if (guardTimer > 0f)
         {
             guardTimer = Mathf.Max(0f, guardTimer - Time.deltaTime);
@@ -365,7 +402,9 @@ public class PlayerController : MonoBehaviour
 
         if (spriteRenderer != null)
         {
-            spriteRenderer.color = guardTimer > 0f ? new Color(0.64f, 1f, 0.95f, 1f) : Color.white;
+            spriteRenderer.color = guardTimer > 0f
+                ? new Color(0.64f, 1f, 0.95f, 1f)
+                : overdriveTimer > 0f ? new Color(1f, 0.78f, 0.46f, 1f) : Color.white;
         }
     }
 

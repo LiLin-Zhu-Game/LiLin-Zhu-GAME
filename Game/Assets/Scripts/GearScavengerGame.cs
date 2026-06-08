@@ -76,6 +76,8 @@ public class GameDirector : MonoBehaviour
     public Sprite ChaserSprite { get; private set; }
     public Sprite DroneSprite { get; private set; }
     public Sprite SupportSprite { get; private set; }
+    public Sprite BulwarkSprite { get; private set; }
+    public Sprite ArtillerySprite { get; private set; }
     public Sprite BossSprite { get; private set; }
     public Sprite BulletSprite { get; private set; }
     public Sprite EnemyBulletSprite { get; private set; }
@@ -86,6 +88,10 @@ public class GameDirector : MonoBehaviour
     public Sprite CrateSprite { get; private set; }
     public Sprite BarrelSprite { get; private set; }
     public Sprite TerminalSprite { get; private set; }
+    public Sprite SkillCoreSprite { get; private set; }
+    public Sprite ShockFieldSprite { get; private set; }
+    public Sprite CoolantZoneSprite { get; private set; }
+    public Sprite DefenseTurretSprite { get; private set; }
     public int SalvageCores => salvageCores;
     public int DefeatedMachines => defeatedMachines;
     public int RoomsCleared => roomsCleared;
@@ -181,7 +187,7 @@ public class GameDirector : MonoBehaviour
         GUI.Label(new Rect(24f, 20f, 480f, 24f), "HUD / Debug: top-left game state");
         GUI.Label(new Rect(24f, 44f, 480f, 24f), $"Enemies awake: {AlertEnemyCount()}/{activeEnemies.Count}    Weapon pickups: {ActiveWeaponPickupCount()}");
         GUI.Label(new Rect(24f, 68f, 480f, 24f), $"Salvage cores: {salvageCores}/3    Machines defeated: {defeatedMachines}");
-        GUI.Label(new Rect(24f, 92f, 480f, 24f), "Goal: clear rooms, upgrade weapons, defeat the breaker boss");
+        GUI.Label(new Rect(24f, 92f, 480f, 24f), "Goal: collect skill cores, exploit room hazards, defeat the breaker boss");
         GUI.Label(new Rect(24f, 116f, 480f, 24f), "E equip    Mouse fire    Q Scrap Nova    F Magnetic Guard    R purge");
         GUI.color = previous;
     }
@@ -348,7 +354,7 @@ public class GameDirector : MonoBehaviour
         title.rectTransform.anchoredPosition = new Vector2(0f, -48f);
         title.rectTransform.sizeDelta = new Vector2(-70f, 50f);
 
-        string tutorial = "WASD: move the robot\nMouse: aim and fire\nSpace: dash through danger\nE: equip nearby weapon drops\nQ: spend 10 scrap to release Scrap Nova\nF: spend 6 scrap for Magnetic Guard\nR: purge weapon heat\n\nClear combat rooms, collect salvage cores, destroy crates for scrap, and defeat the breaker boss.";
+        string tutorial = "WASD: move the robot\nMouse: aim and fire\nSpace: dash through danger\nE: equip nearby weapon drops\nQ: spend 10 scrap to release Scrap Nova\nF: spend 6 scrap for Magnetic Guard\nR: purge weapon heat\n\nCollect glowing skill cores. Shock fields damage awake machines and the player. Coolant pools vent heat and slow enemies. Use cover, explosive barrels, and recovered turrets to control each room.";
         Text body = CreateMenuText(panel.transform, "Tutorial Body", tutorial, 23, TextAnchor.UpperLeft, new Color(0.9f, 0.96f, 0.95f));
         body.rectTransform.anchorMin = new Vector2(0f, 0f);
         body.rectTransform.anchorMax = new Vector2(1f, 1f);
@@ -496,7 +502,10 @@ public class GameDirector : MonoBehaviour
     public void RewardEnemyDefeat(EnemyKind kind, Vector2 position)
     {
         defeatedMachines++;
-        int bonusScrap = kind == EnemyKind.Boss ? 10 : kind == EnemyKind.Support ? 4 : 2;
+        int bonusScrap = kind == EnemyKind.Boss ? 10
+            : kind == EnemyKind.Bulwark ? 6
+            : kind == EnemyKind.Support || kind == EnemyKind.Artillery ? 4
+            : 2;
         for (int i = 0; i < bonusScrap; i++)
         {
             SpawnScrap(position, 1);
@@ -574,12 +583,13 @@ public class GameDirector : MonoBehaviour
         if (includeSupport || room.Difficulty >= 2)
         {
             SpawnEnemy(EnemyKind.Support, PickRoomFloorPoint(room, new Vector2(0f, -ry * 0.15f)));
+            SpawnEnemy(EnemyKind.Artillery, PickRoomFloorPoint(room, new Vector2(-rx * 0.45f, ry * 0.45f)));
         }
 
         if (room.Difficulty >= 3)
         {
-            SpawnEnemy(EnemyKind.Drone, PickRoomFloorPoint(room, new Vector2(-rx * 0.35f, ry * 0.35f)));
-            SpawnEnemy(EnemyKind.Chaser, PickRoomFloorPoint(room, new Vector2(rx * 0.35f, ry * 0.15f)));
+            SpawnEnemy(EnemyKind.Bulwark, PickRoomFloorPoint(room, new Vector2(rx * 0.35f, ry * 0.15f)));
+            SpawnEnemy(EnemyKind.Artillery, PickRoomFloorPoint(room, new Vector2(rx * 0.45f, ry * 0.45f)));
         }
     }
 
@@ -754,16 +764,27 @@ public class GameDirector : MonoBehaviour
         {
             SpawnEnemy(EnemyKind.Drone, PickCombatSpawnPoint(waveNumber + extraChasers + i));
         }
+
+        if (waveNumber >= 3)
+        {
+            SpawnEnemy(EnemyKind.Artillery, PickCombatSpawnPoint(waveNumber + 10));
+        }
+
+        if (waveNumber >= 4)
+        {
+            SpawnEnemy(EnemyKind.Bulwark, PickCombatSpawnPoint(waveNumber + 20));
+        }
     }
 
     private void SpawnBossWave()
     {
         RoomDefinition room = GetBossRoom();
         SpawnEnemy(EnemyKind.Boss, PickRoomFloorPoint(room, Vector2.zero));
-        SpawnEnemy(EnemyKind.Support, PickRoomFloorPoint(room, new Vector2(-3f, -1.2f)));
-        SpawnEnemy(EnemyKind.Support, PickRoomFloorPoint(room, new Vector2(3f, -1.2f)));
-        SpawnEnemy(EnemyKind.Drone, PickRoomFloorPoint(room, new Vector2(-2.6f, 1.6f)));
-        SpawnEnemy(EnemyKind.Drone, PickRoomFloorPoint(room, new Vector2(2.6f, 1.6f)));
+        SpawnEnemy(EnemyKind.Support, PickRoomFloorPoint(room, new Vector2(0f, -2.2f)));
+        SpawnEnemy(EnemyKind.Artillery, PickRoomFloorPoint(room, new Vector2(-2.6f, 1.6f)));
+        SpawnEnemy(EnemyKind.Artillery, PickRoomFloorPoint(room, new Vector2(2.6f, 1.6f)));
+        SpawnEnemy(EnemyKind.Bulwark, PickRoomFloorPoint(room, new Vector2(-3f, -0.8f)));
+        SpawnEnemy(EnemyKind.Bulwark, PickRoomFloorPoint(room, new Vector2(3f, -0.8f)));
         SpawnEnemy(EnemyKind.Chaser, PickRoomFloorPoint(room, new Vector2(-3.2f, 0f)));
         SpawnEnemy(EnemyKind.Chaser, PickRoomFloorPoint(room, new Vector2(3.2f, 0f)));
     }
@@ -983,6 +1004,8 @@ public class GameDirector : MonoBehaviour
         ChaserSprite = LoadSprite("enemy_chaser", SpriteFactory.Circle(new Color(0.96f, 0.33f, 0.3f), new Color(0.35f, 0.05f, 0.04f)));
         DroneSprite = LoadSprite("enemy_drone", SpriteFactory.Circle(new Color(1f, 0.68f, 0.2f), new Color(0.32f, 0.16f, 0.02f)));
         SupportSprite = LoadSprite("enemy_support", SpriteFactory.Diamond(new Color(0.55f, 0.9f, 0.34f), new Color(0.09f, 0.24f, 0.05f)));
+        BulwarkSprite = LoadSprite("enemy_bulwark", SpriteFactory.Square(new Color(0.3f, 0.55f, 0.95f), new Color(0.04f, 0.1f, 0.24f)));
+        ArtillerySprite = LoadSprite("enemy_artillery", SpriteFactory.Diamond(new Color(0.82f, 0.35f, 0.95f), new Color(0.18f, 0.04f, 0.24f)));
         BossSprite = LoadSprite("enemy_boss", SpriteFactory.Diamond(new Color(0.9f, 0.2f, 0.95f), new Color(0.2f, 0.03f, 0.22f)));
         BulletSprite = SpriteFactory.Bolt(new Color(0.8f, 1f, 0.96f), new Color(0.1f, 0.45f, 0.95f));
         EnemyBulletSprite = SpriteFactory.Bolt(new Color(1f, 0.35f, 0.18f), new Color(0.45f, 0.04f, 0.02f));
@@ -993,6 +1016,10 @@ public class GameDirector : MonoBehaviour
         CrateSprite = LoadSprite("crate", SpriteFactory.Square(new Color(0.48f, 0.34f, 0.18f), new Color(0.16f, 0.1f, 0.04f)));
         BarrelSprite = LoadSprite("barrel", SpriteFactory.Circle(new Color(0.55f, 0.17f, 0.12f), new Color(0.12f, 0.06f, 0.05f)));
         TerminalSprite = LoadSprite("terminal", SpriteFactory.Diamond(new Color(0.12f, 0.88f, 0.62f), new Color(0.02f, 0.16f, 0.13f)));
+        SkillCoreSprite = SpriteFactory.Diamond(new Color(0.95f, 0.9f, 0.35f), new Color(0.18f, 0.08f, 0.02f));
+        ShockFieldSprite = SpriteFactory.Circle(new Color(1f, 0.18f, 0.08f, 0.34f), new Color(1f, 0.68f, 0.12f, 0.72f));
+        CoolantZoneSprite = SpriteFactory.Circle(new Color(0.1f, 0.72f, 0.92f, 0.28f), new Color(0.35f, 1f, 0.96f, 0.62f));
+        DefenseTurretSprite = SpriteFactory.Diamond(new Color(0.28f, 0.92f, 0.76f), new Color(0.04f, 0.18f, 0.16f));
 
         weaponTable = new[]
         {
@@ -1140,6 +1167,7 @@ public class GameDirector : MonoBehaviour
         }
 
         PlaceRoomDressing(levelRoot.transform);
+        PlaceRoomFeatures(levelRoot.transform);
         PlaceFloorFeature(levelRoot.transform, -13, 0, 2.2f, 0.95f, new Color(0.18f, 0.5f, 0.52f, 0.5f));
         PlaceFloorFeature(levelRoot.transform, 0, 10, 2.6f, 1.1f, new Color(0.16f, 0.75f, 0.95f, 0.42f));
         PlaceFloorFeature(levelRoot.transform, 13, 0, 2.4f, 0.9f, new Color(0.35f, 0.1f, 0.08f, 0.42f));
@@ -1241,6 +1269,94 @@ public class GameDirector : MonoBehaviour
         PlaceTerminal(root, 0, -13, "Boss Core");
     }
 
+    private void PlaceRoomFeatures(Transform root)
+    {
+        PlaceSkillCore(root, -15, 3, RoomSkillType.KineticOverdrive);
+        PlaceSkillCore(root, 10, 3, RoomSkillType.CoolantMatrix);
+        PlaceSkillCore(root, 3, 10, RoomSkillType.NaniteShell);
+        PlaceSkillCore(root, -3, -10, RoomSkillType.SalvageMagnet);
+
+        PlaceShockField(root, -13, 0, 1.25f);
+        PlaceShockField(root, 13, 0, 1.15f);
+        PlaceShockField(root, -3, -9, 1f);
+        PlaceShockField(root, 3, -11, 1f);
+
+        PlaceCoolantZone(root, 0, 10, 1.55f);
+        PlaceDefenseTurret(root, -3, 10);
+
+        PlaceReinforcedBarricade(root, -11, 1, false);
+        PlaceReinforcedBarricade(root, 13, 2, true);
+        PlaceReinforcedBarricade(root, 13, -2, true);
+        PlaceReinforcedBarricade(root, -2, -8, false);
+        PlaceReinforcedBarricade(root, 2, -12, false);
+    }
+
+    private void PlaceSkillCore(Transform root, int x, int y, RoomSkillType skillType)
+    {
+        GameObject core = new GameObject($"{skillType} Skill Core");
+        core.transform.SetParent(root);
+        core.transform.position = new Vector3(x, y, -0.12f);
+        core.transform.localScale = Vector3.one * 1.15f;
+        SpriteRenderer renderer = core.AddComponent<SpriteRenderer>();
+        renderer.sprite = SkillCoreSprite;
+        renderer.sortingOrder = 10;
+        CircleCollider2D collider = core.AddComponent<CircleCollider2D>();
+        collider.radius = 0.48f;
+        collider.isTrigger = true;
+        core.AddComponent<SkillCorePickup>().Configure(this, skillType);
+    }
+
+    private void PlaceShockField(Transform root, int x, int y, float radius)
+    {
+        GameObject field = new GameObject("Unstable Shock Field");
+        field.transform.SetParent(root);
+        field.transform.position = new Vector3(x, y, 0.72f);
+        SpriteRenderer renderer = field.AddComponent<SpriteRenderer>();
+        renderer.sprite = ShockFieldSprite;
+        renderer.sortingOrder = -6;
+        field.AddComponent<ShockField>().Configure(this, radius);
+    }
+
+    private void PlaceCoolantZone(Transform root, int x, int y, float radius)
+    {
+        GameObject zone = new GameObject("Coolant Recovery Zone");
+        zone.transform.SetParent(root);
+        zone.transform.position = new Vector3(x, y, 0.7f);
+        zone.transform.localScale = Vector3.one * radius * 2f;
+        SpriteRenderer renderer = zone.AddComponent<SpriteRenderer>();
+        renderer.sprite = CoolantZoneSprite;
+        renderer.sortingOrder = -7;
+        CircleCollider2D collider = zone.AddComponent<CircleCollider2D>();
+        collider.radius = 0.5f;
+        collider.isTrigger = true;
+        zone.AddComponent<CoolantZone>().Configure(this);
+    }
+
+    private void PlaceDefenseTurret(Transform root, int x, int y)
+    {
+        GameObject turret = new GameObject("Recovered Defense Turret");
+        turret.transform.SetParent(root);
+        turret.transform.position = new Vector3(x, y, -0.1f);
+        turret.transform.localScale = Vector3.one * 1.6f;
+        SpriteRenderer renderer = turret.AddComponent<SpriteRenderer>();
+        renderer.sprite = DefenseTurretSprite;
+        renderer.sortingOrder = 5;
+        CircleCollider2D collider = turret.AddComponent<CircleCollider2D>();
+        collider.radius = 0.34f;
+        turret.AddComponent<WallMarker>();
+        turret.AddComponent<DefenseTurret>().Configure(this);
+        RegisterBlockedCell(x, y);
+    }
+
+    private void PlaceReinforcedBarricade(Transform root, int x, int y, bool horizontal)
+    {
+        GameObject barricade = CreateBlockingProp(root, "Reinforced Barricade", x, y, 1f, propSprites[0], -1, new Vector2(0.82f, 0.42f));
+        barricade.transform.localScale = new Vector3(1.9f, 0.9f, 1f);
+        barricade.transform.rotation = Quaternion.Euler(0f, 0f, horizontal ? 0f : 90f);
+        barricade.GetComponent<SpriteRenderer>().color = new Color(0.72f, 0.9f, 1f, 1f);
+        barricade.AddComponent<DestructibleProp>().Configure(this, 92, 4, 0.06f, false);
+    }
+
     private void PlaceCrateCluster(Transform root, int startX, int startY, int columns, int rows)
     {
         for (int x = 0; x < columns; x++)
@@ -1262,19 +1378,23 @@ public class GameDirector : MonoBehaviour
 
     private void PlaceCrate(Transform root, int x, int y)
     {
-        GameObject crate = CreateBlockingProp(root, "Breakable Crate", x, y, 0.6f, CrateSprite, -2, new Vector2(0.38f, 0.38f));
+        GameObject crate = CreateBlockingProp(root, "Breakable Crate", x, y, 1.05f, CrateSprite, -2, new Vector2(0.72f, 0.72f));
         crate.AddComponent<DestructibleProp>().Configure(this, 36, 3, 0.08f, false);
     }
 
     private void PlaceBarrel(Transform root, int x, int y, bool volatileBarrel)
     {
-        GameObject barrel = CreateBlockingProp(root, volatileBarrel ? "Volatile Fuel Barrel" : "Scrap Barrel", x, y, 0.58f, BarrelSprite, -2, new Vector2(0.42f, 0.42f));
+        GameObject barrel = CreateBlockingProp(root, volatileBarrel ? "Volatile Fuel Barrel" : "Scrap Barrel", x, y, 1.08f, BarrelSprite, -2, new Vector2(0.58f, 0.58f));
+        barrel.GetComponent<SpriteRenderer>().color = volatileBarrel
+            ? new Color(1f, 0.55f, 0.42f, 1f)
+            : new Color(0.82f, 0.72f, 0.58f, 1f);
         barrel.AddComponent<DestructibleProp>().Configure(this, volatileBarrel ? 28 : 34, volatileBarrel ? 4 : 2, volatileBarrel ? 0.14f : 0.04f, volatileBarrel);
     }
 
     private void PlaceTerminal(Transform root, int x, int y, string terminalName)
     {
-        GameObject terminal = CreateBlockingProp(root, terminalName, x, y, 0.72f, TerminalSprite, -2, new Vector2(0.46f, 0.46f));
+        GameObject terminal = CreateBlockingProp(root, terminalName, x, y, 1.28f, TerminalSprite, -2, new Vector2(0.56f, 0.56f));
+        terminal.GetComponent<SpriteRenderer>().color = new Color(0.58f, 1f, 0.88f, 1f);
         terminal.AddComponent<DestructibleProp>().Configure(this, 58, 5, 0.16f, false);
     }
 
@@ -1296,7 +1416,7 @@ public class GameDirector : MonoBehaviour
 
     private void PlaceDecoration(Transform root, int x, int y, float scale)
     {
-        CreateBlockingProp(root, "Scrap Machinery", x, y, scale * 0.62f, propSprites[Random.Range(0, propSprites.Length)], -2, Vector2.one * 0.42f);
+        CreateBlockingProp(root, "Scrap Machinery", x, y, scale * 1.05f, propSprites[Random.Range(0, propSprites.Length)], -2, Vector2.one * 0.58f);
     }
 
     private void RegisterBlockedCell(int x, int y)
@@ -1325,12 +1445,15 @@ public class GameDirector : MonoBehaviour
         GameObject station = new GameObject(stationName);
         station.transform.SetParent(root);
         station.transform.position = new Vector3(x, y, -0.08f);
-        station.transform.localScale = Vector3.one * 1.35f;
+        station.transform.localScale = Vector3.one * 1.9f;
         SpriteRenderer renderer = station.AddComponent<SpriteRenderer>();
         renderer.sprite = SupplyStationSprite;
+        renderer.color = stationName.Contains("Cooling")
+            ? new Color(0.52f, 0.9f, 1f, 1f)
+            : new Color(0.52f, 1f, 0.64f, 1f);
         renderer.sortingOrder = 2;
         CircleCollider2D collider = station.AddComponent<CircleCollider2D>();
-        collider.radius = 0.44f;
+        collider.radius = 0.38f;
         collider.isTrigger = true;
         station.AddComponent<SupplyStation>().Configure(this, stationName.Contains("Cooling"));
     }
@@ -1491,7 +1614,7 @@ public class GameDirector : MonoBehaviour
         bodyRenderer.sortingOrder = 5;
         bodyTransform.localPosition = new Vector3(0f, -0.02f, 0f);
         bodyTransform.localRotation = Quaternion.identity;
-        bodyTransform.localScale = Vector3.one * (UsingCandidateArt ? 1.15f : 3.85f);
+        bodyTransform.localScale = Vector3.one * (UsingCandidateArt ? 1.55f : 3.85f);
 
         Rigidbody2D rb = playerObject.GetComponent<Rigidbody2D>();
         if (rb == null)
@@ -1562,6 +1685,14 @@ public class GameDirector : MonoBehaviour
         yield return new WaitForSeconds(seconds);
         target.SetActive(false);
     }
+}
+
+public enum RoomSkillType
+{
+    KineticOverdrive,
+    CoolantMatrix,
+    NaniteShell,
+    SalvageMagnet
 }
 
 public enum BulletOwner
@@ -1688,9 +1819,8 @@ public class WeaponController : MonoBehaviour
         if (weaponRenderer != null && stats != null)
         {
             weaponRenderer.sprite = stats.Sprite;
-            weaponRenderer.transform.localPosition = new Vector3(0.38f, 0f, -0.05f);
             weaponRenderer.transform.localRotation = Quaternion.Euler(0f, 0f, -4f);
-            weaponRenderer.transform.localScale = new Vector3(4.8f, 4.8f, 1f);
+            ApplyWeaponVisualTransform();
         }
     }
 
@@ -1721,14 +1851,13 @@ public class WeaponController : MonoBehaviour
             weaponRenderer.sprite = director.DefaultWeaponSprite;
         }
 
-        weaponRenderer.transform.localPosition = new Vector3(0.38f, 0f, -0.05f);
-        weaponRenderer.transform.localScale = new Vector3(4.8f, 4.8f, 1f);
+        ApplyWeaponVisualTransform();
 
         Transform existingMuzzle = weaponPivot.Find("Muzzle");
         GameObject muzzleObject = existingMuzzle != null ? existingMuzzle.gameObject : new GameObject("Muzzle");
         muzzleObject.transform.SetParent(weaponPivot, false);
         muzzlePoint = muzzleObject.transform;
-        muzzlePoint.localPosition = new Vector3(1.18f, 0f, -0.12f);
+        muzzlePoint.localPosition = new Vector3(IsPreparedWeapon(weaponRenderer.sprite) ? 0.92f : 1.18f, 0f, -0.12f);
         muzzlePoint.localRotation = Quaternion.identity;
         muzzlePoint.localScale = Vector3.one;
 
@@ -1743,6 +1872,28 @@ public class WeaponController : MonoBehaviour
         muzzleRenderer.transform.localScale = Vector3.one * 0.18f;
     }
 
+    private void ApplyWeaponVisualTransform()
+    {
+        if (weaponRenderer == null)
+        {
+            return;
+        }
+
+        bool preparedWeapon = IsPreparedWeapon(weaponRenderer.sprite);
+        float scale = preparedWeapon ? 0.82f : 4.8f;
+        weaponRenderer.transform.localPosition = new Vector3(preparedWeapon ? 0.42f : 0.38f, 0f, -0.05f);
+        weaponRenderer.transform.localScale = new Vector3(scale, scale, 1f);
+        if (muzzlePoint != null)
+        {
+            muzzlePoint.localPosition = new Vector3(preparedWeapon ? 0.92f : 1.18f, 0f, -0.12f);
+        }
+    }
+
+    private bool IsPreparedWeapon(Sprite sprite)
+    {
+        return sprite != null && sprite.rect.width >= 48f;
+    }
+
     public void TryFire(Vector2 direction)
     {
         if (Time.time < nextFireTime || player.IsDead)
@@ -1750,7 +1901,7 @@ public class WeaponController : MonoBehaviour
             return;
         }
 
-        nextFireTime = Time.time + FireDelay;
+        nextFireTime = Time.time + FireDelay * player.FireDelayMultiplier;
         player.AddHeat(HeatPerShot);
 
         Vector2 muzzle = GetMuzzleWorldPosition(direction);
@@ -1831,6 +1982,8 @@ public enum EnemyKind
     Chaser,
     Drone,
     Support,
+    Bulwark,
+    Artillery,
     Boss
 }
 
@@ -1855,6 +2008,11 @@ public class EnemyController : MonoBehaviour
     private float contactTimer;
     private float shootTimer;
     private float supportPulseTimer;
+    private float abilityTimer;
+    private float chargeTimer;
+    private float environmentSlowTimer;
+    private float environmentSlowMultiplier = 1f;
+    private int attackPattern;
     private float wakeDistance;
     private Vector2 spawnPosition;
     private Vector2 homeCenter;
@@ -1888,44 +2046,68 @@ public class EnemyController : MonoBehaviour
         contactTimer = 0.25f;
         shootTimer = Random.Range(0.45f, 1.1f);
         supportPulseTimer = Random.Range(0f, 1f);
+        abilityTimer = Random.Range(1.5f, 2.5f);
+        chargeTimer = 0f;
+        environmentSlowTimer = 0f;
+        environmentSlowMultiplier = 1f;
+        attackPattern = 0;
 
         switch (kind)
         {
             case EnemyKind.Chaser:
-                health = maxHealth = 52;
-                speed = 3.15f;
+                health = maxHealth = 64;
+                speed = 3.35f;
                 spriteRenderer.sprite = director.ChaserSprite;
-                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 1.05f : 2.75f);
+                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 1.35f : 2.75f);
                 baseTint = new Color(1f, 0.92f, 0.9f, 1f);
                 healthBarWidth = 0.95f;
                 break;
             case EnemyKind.Drone:
-                health = maxHealth = 42;
-                speed = 2.1f;
+                health = maxHealth = 46;
+                speed = 2.25f;
                 spriteRenderer.sprite = director.DroneSprite;
-                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 0.95f : 2.55f);
+                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 1.25f : 2.55f);
                 baseTint = new Color(0.95f, 0.98f, 1f, 1f);
                 healthBarWidth = 0.9f;
                 break;
             case EnemyKind.Support:
-                health = maxHealth = 64;
-                speed = 1.9f;
+                health = maxHealth = 82;
+                speed = 1.75f;
                 spriteRenderer.sprite = director.SupportSprite;
-                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 1.1f : 2.65f);
+                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 1.4f : 2.65f);
                 baseTint = new Color(0.88f, 1f, 0.9f, 1f);
+                healthBarWidth = 1.05f;
+                break;
+            case EnemyKind.Bulwark:
+                health = maxHealth = 180;
+                speed = 1.35f;
+                spriteRenderer.sprite = director.BulwarkSprite;
+                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 1.65f : 3.1f);
+                baseTint = new Color(0.78f, 0.88f, 1f, 1f);
+                healthBarWidth = 1.3f;
+                break;
+            case EnemyKind.Artillery:
+                health = maxHealth = 58;
+                speed = 1.55f;
+                spriteRenderer.sprite = director.ArtillerySprite;
+                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 1.3f : 2.7f);
+                baseTint = new Color(0.96f, 0.82f, 1f, 1f);
                 healthBarWidth = 1f;
                 break;
             default:
-                health = maxHealth = 240;
-                speed = 2f;
+                health = maxHealth = 480;
+                speed = 1.75f;
                 spriteRenderer.sprite = director.BossSprite;
-                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 1.8f : 3.7f);
+                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 2.2f : 3.7f);
                 baseTint = new Color(1f, 0.88f, 0.86f, 1f);
-                healthBarWidth = 1.45f;
+                healthBarWidth = 1.8f;
                 break;
         }
 
-        wakeDistance = kind == EnemyKind.Boss ? 9.2f : kind == EnemyKind.Drone ? 7.2f : 6.6f;
+        wakeDistance = kind == EnemyKind.Boss ? 9.2f
+            : kind == EnemyKind.Drone || kind == EnemyKind.Artillery ? 7.6f
+            : kind == EnemyKind.Bulwark ? 6.2f
+            : 6.6f;
         spriteRenderer.enabled = true;
         spriteRenderer.color = baseTint * 0.62f;
         shadowRenderer.enabled = true;
@@ -2041,8 +2223,22 @@ public class EnemyController : MonoBehaviour
         float distance = toTarget.magnitude;
         Vector2 direction = distance > 0.01f ? toTarget / distance : Vector2.zero;
         float currentSpeed = IsSupported() ? speed * 1.35f : speed;
+        if (environmentSlowTimer > 0f)
+        {
+            environmentSlowTimer = Mathf.Max(0f, environmentSlowTimer - Time.fixedDeltaTime);
+            currentSpeed *= environmentSlowMultiplier;
+        }
 
-        if (!playerInsideHome && distance < 0.45f)
+        if (kind == EnemyKind.Boss && health <= maxHealth / 2)
+        {
+            currentSpeed *= 1.25f;
+        }
+
+        if (kind == EnemyKind.Bulwark && chargeTimer > 0f && playerInsideHome)
+        {
+            body.velocity = direction * currentSpeed * 3.8f;
+        }
+        else if (!playerInsideHome && distance < 0.45f)
         {
             body.velocity = Vector2.zero;
         }
@@ -2053,6 +2249,18 @@ public class EnemyController : MonoBehaviour
         else if (kind == EnemyKind.Support && playerInsideHome && distance < 3.5f)
         {
             body.velocity = -direction * currentSpeed * 0.45f;
+        }
+        else if (kind == EnemyKind.Support && playerInsideHome && distance < 5f)
+        {
+            body.velocity = Vector2.zero;
+        }
+        else if (kind == EnemyKind.Artillery && playerInsideHome && distance < 5.8f)
+        {
+            body.velocity = -direction * currentSpeed;
+        }
+        else if (kind == EnemyKind.Artillery && playerInsideHome && distance < 7.8f)
+        {
+            body.velocity = Vector2.zero;
         }
         else
         {
@@ -2082,15 +2290,45 @@ public class EnemyController : MonoBehaviour
         }
 
         contactTimer -= Time.deltaTime;
+        abilityTimer -= Time.deltaTime;
+        chargeTimer -= Time.deltaTime;
 
         bool playerInsideHome = IsInsideHomeRoom(player.transform.position, PlayerRoomEntryMargin);
-        if (playerInsideHome && (kind == EnemyKind.Drone || kind == EnemyKind.Boss))
+        if (playerInsideHome)
         {
-            shootTimer -= Time.deltaTime;
-            if (shootTimer <= 0f)
+            if (kind == EnemyKind.Drone || kind == EnemyKind.Artillery || kind == EnemyKind.Boss)
             {
-                FireAtPlayer();
-                shootTimer = kind == EnemyKind.Boss ? 0.75f : 1.45f;
+                shootTimer -= Time.deltaTime;
+                if (shootTimer <= 0f)
+                {
+                    if (kind == EnemyKind.Drone)
+                    {
+                        FirePrecisionShot();
+                        shootTimer = 1.35f;
+                    }
+                    else if (kind == EnemyKind.Artillery)
+                    {
+                        FireArtilleryBarrage();
+                        shootTimer = 2.45f;
+                    }
+                    else
+                    {
+                        FireBossPattern();
+                        shootTimer = health <= maxHealth / 2 ? 0.72f : 1.05f;
+                    }
+                }
+            }
+
+            if (kind == EnemyKind.Support && abilityTimer <= 0f)
+            {
+                RepairNearbyAllies();
+                abilityTimer = 3.2f;
+            }
+
+            if (kind == EnemyKind.Bulwark && abilityTimer <= 0f && Vector2.Distance(player.transform.position, transform.position) <= 6f)
+            {
+                chargeTimer = 0.65f;
+                abilityTimer = 3.8f;
             }
         }
         else
@@ -2104,10 +2342,16 @@ public class EnemyController : MonoBehaviour
             float pulse = 0.8f + Mathf.Sin(supportPulseTimer * 8f) * 0.2f;
             spriteRenderer.color = new Color(pulse, 1f, pulse, 1f);
         }
+        else if (kind == EnemyKind.Bulwark && chargeTimer > 0f)
+        {
+            spriteRenderer.color = Color.Lerp(baseTint, Color.white, 0.55f);
+        }
         else
         {
             float chasePulse = 0.9f + Mathf.Sin(Time.time * 6f) * 0.08f;
-            spriteRenderer.color = IsSupported() ? new Color(0.8f, 1f, 0.8f, 1f) : new Color(1f, chasePulse, chasePulse, 1f);
+            spriteRenderer.color = IsSupported()
+                ? Color.Lerp(baseTint, new Color(0.65f, 1f, 0.65f, 1f), 0.45f)
+                : new Color(baseTint.r * chasePulse, baseTint.g * chasePulse, baseTint.b * chasePulse, 1f);
         }
     }
 
@@ -2119,8 +2363,19 @@ public class EnemyController : MonoBehaviour
         }
 
         WakeUp();
+        float knockbackResistance = 1f;
+        if (kind == EnemyKind.Bulwark)
+        {
+            amount = Mathf.Max(1, Mathf.CeilToInt(amount * 0.48f));
+            knockbackResistance = 0.2f;
+        }
+        else if (kind == EnemyKind.Boss)
+        {
+            knockbackResistance = 0.45f;
+        }
+
         health -= amount;
-        body.AddForce(knockback, ForceMode2D.Impulse);
+        body.AddForce(knockback * knockbackResistance, ForceMode2D.Impulse);
         RefreshHealthBar();
         if (health <= 0)
         {
@@ -2142,18 +2397,99 @@ public class EnemyController : MonoBehaviour
         healthFillRenderer.transform.localPosition = new Vector3(-(healthBarWidth - healthBarWidth * healthRatio) * 0.5f, 0.94f, -0.09f);
     }
 
-    private void FireAtPlayer()
+    public bool RestoreHealth(int amount)
+    {
+        if (!active || health >= maxHealth)
+        {
+            return false;
+        }
+
+        health = Mathf.Min(maxHealth, health + amount);
+        RefreshHealthBar();
+        spriteRenderer.color = Color.Lerp(baseTint, Color.green, 0.45f);
+        return true;
+    }
+
+    public void ApplyEnvironmentalSlow(float duration, float multiplier)
+    {
+        if (!active)
+        {
+            return;
+        }
+
+        environmentSlowTimer = Mathf.Max(environmentSlowTimer, duration);
+        environmentSlowMultiplier = Mathf.Clamp(multiplier, 0.25f, 1f);
+    }
+
+    private void FirePrecisionShot()
     {
         Vector2 direction = (player.transform.position - transform.position).normalized;
-        Bullet bullet = director.GetEnemyBullet();
-        bullet.Fire((Vector2)transform.position + direction * 0.55f, direction, kind == EnemyKind.Boss ? 8.5f : 7.2f, kind == EnemyKind.Boss ? 12 : 8, 2.2f);
+        FireEnemyBullet(direction, 8.8f, 9, 2.1f);
+    }
 
-        if (kind == EnemyKind.Boss)
+    private void FireArtilleryBarrage()
+    {
+        Vector2 direction = (player.transform.position - transform.position).normalized;
+        for (int angle = -32; angle <= 32; angle += 16)
         {
-            Vector2 left = Quaternion.Euler(0f, 0f, 18f) * direction;
-            Vector2 right = Quaternion.Euler(0f, 0f, -18f) * direction;
-            director.GetEnemyBullet().Fire((Vector2)transform.position + left * 0.55f, left, 7.5f, 8, 2.1f);
-            director.GetEnemyBullet().Fire((Vector2)transform.position + right * 0.55f, right, 7.5f, 8, 2.1f);
+            Vector2 shotDirection = Quaternion.Euler(0f, 0f, angle) * direction;
+            FireEnemyBullet(shotDirection, 5.4f, 6, 2.7f);
+        }
+    }
+
+    private void FireBossPattern()
+    {
+        Vector2 direction = (player.transform.position - transform.position).normalized;
+        bool secondPhase = health <= maxHealth / 2;
+        if (attackPattern % 2 == 0)
+        {
+            FireEnemyBullet(direction, secondPhase ? 10.5f : 9f, 13, 2.25f);
+            for (int angle = -24; angle <= 24; angle += 48)
+            {
+                Vector2 side = Quaternion.Euler(0f, 0f, angle) * direction;
+                FireEnemyBullet(side, 8f, 9, 2.3f);
+            }
+        }
+        else
+        {
+            int projectileCount = secondPhase ? 12 : 8;
+            float angleOffset = secondPhase ? Time.time * 50f : 0f;
+            for (int i = 0; i < projectileCount; i++)
+            {
+                float angle = angleOffset + i * (360f / projectileCount);
+                Vector2 radialDirection = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad));
+                FireEnemyBullet(radialDirection, secondPhase ? 7.2f : 6.2f, 7, 2.5f);
+            }
+        }
+
+        attackPattern++;
+    }
+
+    private void FireEnemyBullet(Vector2 direction, float bulletSpeed, int damage, float lifetime)
+    {
+        Vector2 normalized = direction.sqrMagnitude > 0.01f ? direction.normalized : Vector2.right;
+        Bullet bullet = director.GetEnemyBullet();
+        bullet.Fire((Vector2)transform.position + normalized * 0.55f, normalized, bulletSpeed, damage, lifetime);
+    }
+
+    private void RepairNearbyAllies()
+    {
+        EnemyController[] enemies = FindObjectsOfType<EnemyController>();
+        int repaired = 0;
+        foreach (EnemyController enemy in enemies)
+        {
+            if (enemy != this && enemy.gameObject.activeInHierarchy && Vector2.Distance(transform.position, enemy.transform.position) <= 4.5f)
+            {
+                if (enemy.RestoreHealth(14))
+                {
+                    repaired++;
+                }
+            }
+        }
+
+        if (repaired > 0)
+        {
+            director?.ShowStatus($"Support repair pulse restored {repaired} machines", 0.8f);
         }
     }
 
@@ -2236,8 +2572,12 @@ public class EnemyController : MonoBehaviour
         if (hitPlayer != null && contactTimer <= 0f && IsInsideHomeRoom(hitPlayer.transform.position, PlayerRoomEntryMargin))
         {
             WakeUp();
-            hitPlayer.TakeDamage(kind == EnemyKind.Boss ? 18 : 10);
-            contactTimer = 0.7f;
+            int contactDamage = kind == EnemyKind.Boss ? 24
+                : kind == EnemyKind.Bulwark ? 22
+                : kind == EnemyKind.Chaser ? 13
+                : 8;
+            hitPlayer.TakeDamage(contactDamage);
+            contactTimer = kind == EnemyKind.Bulwark ? 1.15f : kind == EnemyKind.Chaser ? 0.55f : 0.8f;
         }
     }
 
@@ -2410,6 +2750,7 @@ public class WeaponPickup : MonoBehaviour
     private SpriteRenderer glowRenderer;
     private WeaponStats stats;
     private float bobSeed;
+    private float displayScale = 4.25f;
 
     public WeaponStats Stats => stats;
     public string DisplayName => stats != null ? stats.Name : "Weapon";
@@ -2434,13 +2775,15 @@ public class WeaponPickup : MonoBehaviour
 
         spriteRenderer.sprite = stats.Sprite;
         spriteRenderer.sortingOrder = 9;
+        displayScale = stats.Sprite != null && stats.Sprite.rect.width >= 48f ? 1.35f : 4.25f;
+        transform.localScale = Vector3.one * displayScale;
         gameObject.SetActive(true);
     }
 
     private void Update()
     {
         float bob = Mathf.Sin((Time.time + bobSeed) * 2.8f) * 0.08f;
-        transform.localScale = Vector3.one * (4.25f + bob);
+        transform.localScale = Vector3.one * (displayScale + bob);
         transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Sin((Time.time + bobSeed) * 2.8f) * 6f);
     }
 
@@ -2464,6 +2807,286 @@ public class WeaponPickup : MonoBehaviour
         glowRenderer = glow.AddComponent<SpriteRenderer>();
         glowRenderer.sprite = SpriteFactory.Circle(new Color(0.35f, 0.85f, 1f, 0.32f), Color.clear);
         glowRenderer.sortingOrder = 5;
+    }
+}
+
+public class SkillCorePickup : MonoBehaviour
+{
+    private GameDirector director;
+    private RoomSkillType skillType;
+    private SpriteRenderer spriteRenderer;
+    private SpriteRenderer glowRenderer;
+    private float bobSeed;
+    private bool collected;
+
+    public void Configure(GameDirector owner, RoomSkillType type)
+    {
+        director = owner;
+        skillType = type;
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        bobSeed = Random.Range(0f, 8f);
+
+        Color skillColor = GetSkillColor(type);
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = skillColor;
+        }
+
+        GameObject glow = new GameObject("Skill Core Glow");
+        glow.transform.SetParent(transform, false);
+        glow.transform.localPosition = new Vector3(0f, 0f, 0.08f);
+        glow.transform.localScale = Vector3.one * 1.65f;
+        glowRenderer = glow.AddComponent<SpriteRenderer>();
+        glowRenderer.sprite = SpriteFactory.Circle(new Color(skillColor.r, skillColor.g, skillColor.b, 0.28f), Color.clear);
+        glowRenderer.sortingOrder = 7;
+    }
+
+    private void Update()
+    {
+        if (collected)
+        {
+            return;
+        }
+
+        float pulse = 1f + Mathf.Sin((Time.time + bobSeed) * 4f) * 0.12f;
+        transform.localScale = Vector3.one * 1.15f * pulse;
+        transform.rotation = Quaternion.Euler(0f, 0f, Time.time * 42f + bobSeed * 12f);
+        if (glowRenderer != null)
+        {
+            glowRenderer.transform.localScale = Vector3.one * (1.55f + Mathf.Sin((Time.time + bobSeed) * 3f) * 0.18f);
+        }
+    }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        PlayerController player = other.GetComponent<PlayerController>();
+        if (collected || player == null)
+        {
+            return;
+        }
+
+        collected = true;
+        director.PlayPurgeEffect(transform.position, 1.25f);
+        player.ApplyRoomSkill(skillType);
+        Destroy(gameObject);
+    }
+
+    private static Color GetSkillColor(RoomSkillType type)
+    {
+        switch (type)
+        {
+            case RoomSkillType.KineticOverdrive:
+                return new Color(1f, 0.55f, 0.16f, 1f);
+            case RoomSkillType.CoolantMatrix:
+                return new Color(0.22f, 0.88f, 1f, 1f);
+            case RoomSkillType.NaniteShell:
+                return new Color(0.38f, 1f, 0.48f, 1f);
+            default:
+                return new Color(0.88f, 0.48f, 1f, 1f);
+        }
+    }
+}
+
+public class ShockField : MonoBehaviour
+{
+    private GameDirector director;
+    private SpriteRenderer spriteRenderer;
+    private float radius;
+    private float nextPulse;
+
+    public void Configure(GameDirector owner, float fieldRadius)
+    {
+        director = owner;
+        radius = fieldRadius;
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        transform.localScale = Vector3.one * radius * 2f;
+        nextPulse = Time.time + Random.Range(0.5f, 1.2f);
+    }
+
+    private void Update()
+    {
+        float warningPulse = 0.9f + Mathf.Sin(Time.time * 7f) * 0.1f;
+        transform.localScale = Vector3.one * radius * 2f * warningPulse;
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = new Color(1f, 0.32f + warningPulse * 0.12f, 0.08f, 0.52f);
+        }
+
+        if (Time.time < nextPulse)
+        {
+            return;
+        }
+
+        nextPulse = Time.time + 1.65f;
+        Pulse();
+    }
+
+    private void Pulse()
+    {
+        bool hitPlayer = false;
+        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, radius);
+        foreach (Collider2D hit in hits)
+        {
+            EnemyController enemy = hit.GetComponent<EnemyController>();
+            if (enemy != null)
+            {
+                if (!enemy.IsAwake)
+                {
+                    continue;
+                }
+
+                Vector2 offset = enemy.transform.position - transform.position;
+                enemy.TakeDamage(16, offset.normalized * 2.4f);
+                continue;
+            }
+
+            PlayerController player = hit.GetComponent<PlayerController>();
+            if (player != null)
+            {
+                player.TakeDamage(7);
+                hitPlayer = true;
+            }
+        }
+
+        StartCoroutine(FlashPulse());
+        if (hitPlayer)
+        {
+            director.ShowStatus("Unstable field discharged: lure machines into the next pulse", 1.15f);
+        }
+    }
+
+    private IEnumerator FlashPulse()
+    {
+        if (spriteRenderer == null)
+        {
+            yield break;
+        }
+
+        spriteRenderer.color = new Color(1f, 0.95f, 0.42f, 0.9f);
+        yield return new WaitForSeconds(0.12f);
+    }
+}
+
+public class CoolantZone : MonoBehaviour
+{
+    private GameDirector director;
+    private SpriteRenderer spriteRenderer;
+    private float nextStatusTime;
+
+    public void Configure(GameDirector owner)
+    {
+        director = owner;
+        spriteRenderer = GetComponent<SpriteRenderer>();
+    }
+
+    private void Update()
+    {
+        if (spriteRenderer != null)
+        {
+            float pulse = 0.34f + Mathf.Sin(Time.time * 3.5f) * 0.08f;
+            spriteRenderer.color = new Color(0.12f, 0.78f, 1f, pulse);
+        }
+    }
+
+    private void OnTriggerStay2D(Collider2D other)
+    {
+        PlayerController player = other.GetComponent<PlayerController>();
+        if (player != null)
+        {
+            player.CoolWeapon(32f * Time.fixedDeltaTime);
+            if (Time.time >= nextStatusTime)
+            {
+                nextStatusTime = Time.time + 2.4f;
+                director.ShowStatus("Coolant pool: weapon heat venting rapidly", 0.9f);
+            }
+
+            return;
+        }
+
+        EnemyController enemy = other.GetComponent<EnemyController>();
+        enemy?.ApplyEnvironmentalSlow(0.25f, 0.52f);
+    }
+}
+
+public class DefenseTurret : MonoBehaviour
+{
+    private GameDirector director;
+    private PlayerController player;
+    private SpriteRenderer spriteRenderer;
+    private float nextShotTime;
+
+    public void Configure(GameDirector owner)
+    {
+        director = owner;
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        nextShotTime = Time.time + 0.8f;
+    }
+
+    private void Update()
+    {
+        if (player == null)
+        {
+            player = FindObjectOfType<PlayerController>();
+        }
+
+        if (player == null || Vector2.Distance(transform.position, player.transform.position) > 5.6f)
+        {
+            SetIdleColor();
+            return;
+        }
+
+        EnemyController target = FindTarget();
+        if (target == null)
+        {
+            SetIdleColor();
+            return;
+        }
+
+        Vector2 direction = ((Vector2)target.transform.position - (Vector2)transform.position).normalized;
+        transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 45f);
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = Color.Lerp(new Color(0.28f, 0.92f, 0.76f), Color.white, 0.22f);
+        }
+
+        if (Time.time < nextShotTime)
+        {
+            return;
+        }
+
+        nextShotTime = Time.time + 0.72f;
+        Bullet bullet = director.GetPlayerBullet();
+        bullet.Fire((Vector2)transform.position + direction * 0.85f, direction, 13f, 13, 1.3f);
+    }
+
+    private void SetIdleColor()
+    {
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = new Color(0.55f, 0.72f, 0.7f, 1f);
+        }
+    }
+
+    private EnemyController FindTarget()
+    {
+        EnemyController best = null;
+        float bestDistance = 6.2f;
+        foreach (EnemyController enemy in FindObjectsOfType<EnemyController>())
+        {
+            if (!enemy.gameObject.activeInHierarchy || !enemy.IsAwake)
+            {
+                continue;
+            }
+
+            float distance = Vector2.Distance(transform.position, enemy.transform.position);
+            if (distance < bestDistance)
+            {
+                best = enemy;
+                bestDistance = distance;
+            }
+        }
+
+        return best;
     }
 }
 
