@@ -11,6 +11,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float dashCooldown = 0.9f;
 
     [Header("Survival")]
+    [SerializeField] private int maxHealth = 100;
     [SerializeField] private int maxArmor = 100;
     [SerializeField] private float scrapPickupRadius = 1.45f;
 
@@ -46,11 +47,14 @@ public class PlayerController : MonoBehaviour
     private float overdriveTimer;
     private float heatGainMultiplier = 1f;
     private WeaponPickup nearbyWeapon;
+    private int health;
     private int armor;
     private int scrap;
     private bool overheated;
     private bool dead;
 
+    public int Health => health;
+    public int MaxHealth => maxHealth;
     public int Armor => armor;
     public int MaxArmor => maxArmor;
     public int Scrap => scrap;
@@ -74,6 +78,7 @@ public class PlayerController : MonoBehaviour
         director = owner;
         weapon = playerWeapon;
         mainCamera = Camera.main;
+        health = maxHealth;
         armor = maxArmor;
         scrap = 0;
         Heat = 0f;
@@ -184,9 +189,11 @@ public class PlayerController : MonoBehaviour
         }
 
         int finalDamage = guardTimer > 0f ? Mathf.Max(1, Mathf.RoundToInt(amount * (1f - guardDamageReduction))) : amount;
-        armor = Mathf.Max(0, armor - finalDamage);
+        int absorbed = Mathf.Min(armor, finalDamage);
+        armor -= absorbed;
+        health = Mathf.Max(0, health - (finalDamage - absorbed));
         director.FlashDamage();
-        if (armor <= 0)
+        if (health <= 0)
         {
             dead = true;
             director.PlayerDied();
@@ -207,6 +214,16 @@ public class PlayerController : MonoBehaviour
         }
 
         armor = Mathf.Min(maxArmor, armor + amount);
+    }
+
+    public void RepairHealth(int amount)
+    {
+        if (dead)
+        {
+            return;
+        }
+
+        health = Mathf.Min(maxHealth, health + amount);
     }
 
     public void CoolWeapon(float amount)
@@ -250,6 +267,7 @@ public class PlayerController : MonoBehaviour
             case RoomSkillType.NaniteShell:
                 maxArmor += 25;
                 armor = Mathf.Min(maxArmor, armor + 45);
+                RepairHealth(20);
                 director.ShowStatus("Nanite Shell installed: maximum armor increased by 25", 2.4f);
                 break;
             default:
@@ -453,6 +471,17 @@ public class PlayerController : MonoBehaviour
         if (nearbyWeapon != null)
         {
             director.ShowStatus($"Press E to equip {nearbyWeapon.DisplayName}", 0.08f);
+        }
+    }
+
+    public void MoveToNewMap(Vector2 position)
+    {
+        transform.position = new Vector3(position.x, position.y, 0f);
+        nearbyWeapon = null;
+        dashTimer = 0f;
+        if (body != null)
+        {
+            body.velocity = Vector2.zero;
         }
     }
 }

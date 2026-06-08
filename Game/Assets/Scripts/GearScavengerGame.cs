@@ -45,6 +45,7 @@ public class GameDirector : MonoBehaviour
     private readonly HashSet<Vector2Int> walkable = new HashSet<Vector2Int>();
     private readonly HashSet<Vector2Int> blockedCells = new HashSet<Vector2Int>();
     private readonly List<RoomDefinition> rooms = new List<RoomDefinition>();
+    private readonly Dictionary<GameMode, Button> modeButtons = new Dictionary<GameMode, Button>();
 
     private ObjectPool playerBullets;
     private ObjectPool enemyBullets;
@@ -121,13 +122,13 @@ public class GameDirector : MonoBehaviour
             mainMenuCanvas = null;
         }
 
-        wave = 0;
+        wave = 1;
         salvageCores = 0;
         defeatedMachines = 0;
         roomsCleared = 0;
         gameOver = false;
         statusTimer = 0f;
-        BuildLevel();
+        BuildLevel(false);
         BuildPools();
         SpawnPlayer();
         SpawnStarterWeaponDrops();
@@ -150,6 +151,15 @@ public class GameDirector : MonoBehaviour
 
     private void Update()
     {
+        if (Input.GetKeyDown(KeyCode.F11))
+        {
+            Screen.fullScreen = !Screen.fullScreen;
+            if (gameStarted)
+            {
+                ShowStatus(Screen.fullScreen ? "Fullscreen enabled" : "Windowed display enabled", 1.2f);
+            }
+        }
+
         if (!gameStarted)
         {
             return;
@@ -162,7 +172,9 @@ public class GameDirector : MonoBehaviour
             statusTimer -= Time.deltaTime;
             if (statusTimer <= 0f && !gameOver)
             {
-                hud?.SetMessage("Clear rooms -> collect salvage cores -> adapt weapons -> defeat the breaker boss");
+                hud?.SetMessage(wave < 4
+                    ? "Clear all four combat rooms to generate the next wave map"
+                    : "Boss Wave 4: destroy the Breaker in the isolated arena");
             }
         }
 
@@ -170,26 +182,7 @@ public class GameDirector : MonoBehaviour
         {
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
-    }
 
-    private void OnGUI()
-    {
-        if (!gameStarted)
-        {
-            return;
-        }
-
-        Color previous = GUI.color;
-        Rect panel = new Rect(12f, 12f, 520f, 132f);
-        GUI.color = new Color(0f, 0f, 0f, 0.72f);
-        GUI.DrawTexture(panel, Texture2D.whiteTexture);
-        GUI.color = Color.white;
-        GUI.Label(new Rect(24f, 20f, 480f, 24f), "HUD / Debug: top-left game state");
-        GUI.Label(new Rect(24f, 44f, 480f, 24f), $"Enemies awake: {AlertEnemyCount()}/{activeEnemies.Count}    Weapon pickups: {ActiveWeaponPickupCount()}");
-        GUI.Label(new Rect(24f, 68f, 480f, 24f), $"Salvage cores: {salvageCores}/3    Machines defeated: {defeatedMachines}");
-        GUI.Label(new Rect(24f, 92f, 480f, 24f), "Goal: collect skill cores, exploit room hazards, defeat the breaker boss");
-        GUI.Label(new Rect(24f, 116f, 480f, 24f), "E equip    Mouse fire    Q Scrap Nova    F Magnetic Guard    R purge");
-        GUI.color = previous;
     }
 
     private void CreateMainMenu()
@@ -225,7 +218,7 @@ public class GameDirector : MonoBehaviour
         title.rectTransform.anchoredPosition = new Vector2(0f, -62f);
         title.rectTransform.sizeDelta = new Vector2(900f, 78f);
 
-        Text subtitle = CreateMenuText(mainMenuCanvas.transform, "Subtitle", "Rebuild a scavenger robot, raid ruined machine rooms, and survive the breaker core.", 22, TextAnchor.MiddleCenter, new Color(0.86f, 0.92f, 0.9f));
+        Text subtitle = CreateMenuText(mainMenuCanvas.transform, "Subtitle", "Rebuild a scavenger robot, clear three sectors, then destroy the Wave 4 Breaker.  F11: fullscreen", 22, TextAnchor.MiddleCenter, new Color(0.86f, 0.92f, 0.9f));
         subtitle.rectTransform.anchorMin = new Vector2(0.5f, 1f);
         subtitle.rectTransform.anchorMax = new Vector2(0.5f, 1f);
         subtitle.rectTransform.anchoredPosition = new Vector2(0f, -116f);
@@ -255,6 +248,7 @@ public class GameDirector : MonoBehaviour
         modeDescriptionText.rectTransform.offsetMin = new Vector2(28f, modeDescriptionText.rectTransform.offsetMin.y);
         modeDescriptionText.rectTransform.offsetMax = new Vector2(-28f, modeDescriptionText.rectTransform.offsetMax.y);
         UpdateModeDescription();
+        UpdateModeButtonVisuals();
 
         Image actionPanel = CreateMenuImage(mainMenuCanvas.transform, "Action Panel", new Color(0.018f, 0.03f, 0.034f, 0.94f));
         actionPanel.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
@@ -262,7 +256,7 @@ public class GameDirector : MonoBehaviour
         actionPanel.rectTransform.anchoredPosition = new Vector2(250f, -48f);
         actionPanel.rectTransform.sizeDelta = new Vector2(430f, 370f);
 
-        Text brief = CreateMenuText(actionPanel.transform, "Briefing", "MISSION BRIEFING\n\nCollect salvage cores, swap weapons from room drops, use scrap to trigger robot abilities, then break through the final vault.", 23, TextAnchor.UpperLeft, new Color(0.92f, 0.96f, 0.94f));
+        Text brief = CreateMenuText(actionPanel.transform, "Briefing", "MISSION BRIEFING\n\nClear three normal Waves while preserving weapons and upgrades. After Wave 3, enter the isolated Wave 4 Boss arena.\n\nSTART GAME: launch selected mode\nTUTORIAL: controls and rules\nQUIT: exit built game", 20, TextAnchor.UpperLeft, new Color(0.92f, 0.96f, 0.94f));
         brief.rectTransform.anchorMin = new Vector2(0f, 1f);
         brief.rectTransform.anchorMax = new Vector2(1f, 1f);
         brief.rectTransform.anchoredPosition = new Vector2(0f, -118f);
@@ -293,7 +287,9 @@ public class GameDirector : MonoBehaviour
         {
             selectedMode = mode;
             UpdateModeDescription();
+            UpdateModeButtonVisuals();
         });
+        modeButtons[mode] = button;
 
         Text label = button.GetComponentInChildren<Text>();
         if (label != null)
@@ -354,7 +350,7 @@ public class GameDirector : MonoBehaviour
         title.rectTransform.anchoredPosition = new Vector2(0f, -48f);
         title.rectTransform.sizeDelta = new Vector2(-70f, 50f);
 
-        string tutorial = "WASD: move the robot\nMouse: aim and fire\nSpace: dash through danger\nE: equip nearby weapon drops\nQ: spend 10 scrap to release Scrap Nova\nF: spend 6 scrap for Magnetic Guard\nR: purge weapon heat\n\nCollect glowing skill cores. Shock fields damage awake machines and the player. Coolant pools vent heat and slow enemies. Use cover, explosive barrels, and recovered turrets to control each room.";
+        string tutorial = "WASD: move the robot\nMouse: aim and fire\nSpace: dash through danger\nE: equip nearby weapon drops\nQ: spend 10 scrap to release Scrap Nova\nF: spend 6 scrap for Magnetic Guard\nR: purge weapon heat\nF11: toggle fullscreen\n\nDamage removes armor before core integrity. Touch Skill Cores to install upgrades. Clear all four combat rooms to generate the next map. Complete Wave 3 to enter the isolated Boss arena in Wave 4.";
         Text body = CreateMenuText(panel.transform, "Tutorial Body", tutorial, 23, TextAnchor.UpperLeft, new Color(0.9f, 0.96f, 0.95f));
         body.rectTransform.anchorMin = new Vector2(0f, 0f);
         body.rectTransform.anchorMax = new Vector2(1f, 1f);
@@ -394,14 +390,35 @@ public class GameDirector : MonoBehaviour
         switch (selectedMode)
         {
             case GameMode.Challenge:
-                modeDescriptionText.text = "Challenge Mode: extra pressure spawns at the start. Best for showing combat and weapon variety quickly.";
+                modeDescriptionText.text = "Challenge Mode: the normal mission plus an extra opening attack group. More enemies immediately; Boss still arrives in Wave 4.";
                 break;
             case GameMode.Training:
-                modeDescriptionText.text = "Training Mode: extra weapons spawn near the start so you can test guns and abilities before harder fights.";
+                modeDescriptionText.text = "Training Mode: two extra random weapons spawn at the start. Best for learning controls and demonstrating weapon variety.";
                 break;
             default:
-                modeDescriptionText.text = "Story Mode: balanced room clearing, salvage rewards, and final boss progression.";
+                modeDescriptionText.text = "Story Mode: standard enemy counts and rewards. Clear Waves 1-3, then fight the Boss in Wave 4.";
                 break;
+        }
+    }
+
+    private void UpdateModeButtonVisuals()
+    {
+        foreach (KeyValuePair<GameMode, Button> entry in modeButtons)
+        {
+            bool selected = entry.Key == selectedMode;
+            Color color = selected
+                ? new Color(0.08f, 0.48f, 0.42f, 0.98f)
+                : new Color(0.1f, 0.18f, 0.2f, 0.96f);
+            Image image = entry.Value.GetComponent<Image>();
+            if (image != null)
+            {
+                image.color = color;
+            }
+
+            ColorBlock colors = entry.Value.colors;
+            colors.normalColor = color;
+            colors.highlightedColor = new Color(Mathf.Min(color.r + 0.12f, 1f), Mathf.Min(color.g + 0.12f, 1f), Mathf.Min(color.b + 0.12f, 1f), color.a);
+            entry.Value.colors = colors;
         }
     }
 
@@ -410,11 +427,11 @@ public class GameDirector : MonoBehaviour
         switch (selectedMode)
         {
             case GameMode.Challenge:
-                return "Challenge Mode: survive heavier machine pressure and secure the breaker core.";
+                return "Challenge Mode: extra opening enemies. Clear three normal Waves, then defeat the Wave 4 Boss.";
             case GameMode.Training:
-                return "Training Mode: test weapons, learn scrap skills, then clear the ruin.";
+                return "Training Mode: extra starting weapons. Clear three normal Waves, then defeat the Wave 4 Boss.";
             default:
-                return "Story Mode: clear rooms, collect 3 salvage cores, then survive the boss.";
+                return "Story Mode: clear three normal Waves, collect 3 salvage cores, then defeat the Wave 4 Boss.";
         }
     }
 
@@ -674,7 +691,7 @@ public class GameDirector : MonoBehaviour
     public void PlayerDied()
     {
         gameOver = true;
-        hud?.SetMessage("Armor destroyed. Press Enter to rebuild the scavenger.");
+        hud?.SetMessage("Core integrity destroyed. Press Enter to rebuild the scavenger.");
     }
 
     public void PlayPurgeEffect(Vector2 position, float radius)
@@ -688,29 +705,9 @@ public class GameDirector : MonoBehaviour
 
     private IEnumerator WaveRoutine()
     {
-        wave = 1;
         yield return new WaitForSeconds(0.4f);
-        while (activeEnemies.Count > 0 && !gameOver)
+        while (!gameOver)
         {
-            yield return null;
-        }
-
-        AwardRoomClearReward("First sweep complete: armor repaired and a salvage core recovered.");
-
-        for (wave = 2; wave <= 5; wave++)
-        {
-            bool isBossWave = wave == 5;
-            ShowStatus(isBossWave ? "Boss wave: the breaker unit guards the final core" : $"Threat level {wave}: rooms reconstruct with tougher machines", 2.2f);
-            if (isBossWave)
-            {
-                SpawnBossWave();
-            }
-            else
-            {
-                SpawnGuaranteedRoomEnemies();
-                SpawnExtraWavePressure(wave);
-            }
-
             while (activeEnemies.Count > 0 && !gameOver)
             {
                 yield return null;
@@ -721,16 +718,38 @@ public class GameDirector : MonoBehaviour
                 yield break;
             }
 
-            if (wave < 5)
+            if (wave >= 4)
             {
-                AwardRoomClearReward("Room clear: salvage core secured, armor repaired, weapon cache opened.");
+                gameOver = true;
+                hud?.SetMessage("BREAKER DESTROYED - mission complete. Press Enter to replay.");
+                yield break;
+            }
+
+            AwardRoomClearReward(wave == 1
+                ? "First sweep complete: four combat rooms cleared."
+                : $"Wave {wave} complete: four combat rooms cleared.");
+
+            wave++;
+            bool isBossWave = wave == 4;
+            ShowStatus(isBossWave
+                ? "Wave 3 complete. Building the isolated Breaker Boss arena..."
+                : $"Wave {wave - 1} complete. Generating a new four-room sector for Wave {wave}...", 1.4f);
+            yield return new WaitForSeconds(0.35f);
+
+            PrepareNextWaveMap(isBossWave);
+            if (isBossWave)
+            {
+                SpawnBossWave();
+                ShowStatus("BOSS WAVE 4: destroy the Breaker in the isolated arena", 3f);
+            }
+            else
+            {
+                SpawnGuaranteedRoomEnemies();
+                SpawnExtraWavePressure(wave);
                 SpawnRoomWeaponDrops(1);
-                yield return new WaitForSeconds(2f);
+                ShowStatus($"WAVE {wave}: clear all four combat rooms", 2.5f);
             }
         }
-
-        gameOver = true;
-        hud?.SetMessage("Prototype complete. You escaped the mechanical ruin with the salvage core. Press Enter to replay.");
     }
 
     private void AwardRoomClearReward(string message)
@@ -738,7 +757,34 @@ public class GameDirector : MonoBehaviour
         roomsCleared++;
         salvageCores = Mathf.Min(3, salvageCores + 1);
         player?.RepairArmor(18 + roomsCleared * 4);
+        player?.RepairHealth(12 + roomsCleared * 3);
         ShowStatus($"{message}  Cores {salvageCores}/3", 2.4f);
+    }
+
+    private void PrepareNextWaveMap(bool bossArena)
+    {
+        DeactivateTransientObjects();
+        BuildLevel(bossArena);
+        Vector2 spawn = ToNearestFloorPoint(bossArena ? new Vector2(0f, -3.2f) : Vector2.zero);
+        player?.MoveToNewMap(spawn);
+    }
+
+    private void DeactivateTransientObjects()
+    {
+        foreach (WeaponPickup pickup in FindObjectsOfType<WeaponPickup>())
+        {
+            pickup.gameObject.SetActive(false);
+        }
+
+        foreach (ScrapPickup pickup in FindObjectsOfType<ScrapPickup>())
+        {
+            pickup.gameObject.SetActive(false);
+        }
+
+        foreach (Bullet bullet in FindObjectsOfType<Bullet>())
+        {
+            bullet.gameObject.SetActive(false);
+        }
     }
 
     private void SpawnEnemy(EnemyKind kind, Vector2 position)
@@ -1100,7 +1146,7 @@ public class GameDirector : MonoBehaviour
         mainCamera.gameObject.AddComponent<CameraFollow>();
     }
 
-    private void BuildLevel()
+    private void BuildLevel(bool bossArena)
     {
         RemoveSceneObject("Generated Mechanical Rooms");
         GameObject levelRoot = new GameObject("Generated Mechanical Rooms");
@@ -1109,15 +1155,22 @@ public class GameDirector : MonoBehaviour
         blockedCells.Clear();
         rooms.Clear();
 
-        AddRoom(0, 0, 10, 8, false, 0, "Start Workshop");
-        AddRoom(-13, 0, 9, 8, true, 1, "Scrap Yard");
-        AddRoom(13, 0, 9, 8, true, 2, "Assembly Maze");
-        AddRoom(0, 10, 8, 7, true, 2, "Cache Room");
-        AddRoom(0, -10, 10, 7, true, 3, "Breaker Vault");
-        AddCorridor(-6, 0, 4, 3);
-        AddCorridor(6, 0, 4, 3);
-        AddCorridor(0, 5, 3, 4);
-        AddCorridor(0, -5, 3, 4);
+        if (bossArena)
+        {
+            AddRoom(0, 0, 14, 10, true, 3, "Isolated Breaker Arena");
+        }
+        else
+        {
+            AddRoom(0, 0, 10, 8, false, 0, "Start Workshop");
+            AddRoom(-13, 0, 9, 8, true, 1, "Scrap Yard");
+            AddRoom(13, 0, 9, 8, true, 2, "Assembly Maze");
+            AddRoom(0, 10, 8, 7, true, 2, "Cache Room");
+            AddRoom(0, -10, 10, 7, true, 3, "Reactor Yard");
+            AddCorridor(-6, 0, 4, 3);
+            AddCorridor(6, 0, 4, 3);
+            AddCorridor(0, 5, 3, 4);
+            AddCorridor(0, -5, 3, 4);
+        }
 
         foreach (Vector2Int cell in walkable)
         {
@@ -1166,14 +1219,36 @@ public class GameDirector : MonoBehaviour
             wall.AddComponent<WallMarker>();
         }
 
-        PlaceRoomDressing(levelRoot.transform);
-        PlaceRoomFeatures(levelRoot.transform);
-        PlaceFloorFeature(levelRoot.transform, -13, 0, 2.2f, 0.95f, new Color(0.18f, 0.5f, 0.52f, 0.5f));
-        PlaceFloorFeature(levelRoot.transform, 0, 10, 2.6f, 1.1f, new Color(0.16f, 0.75f, 0.95f, 0.42f));
-        PlaceFloorFeature(levelRoot.transform, 13, 0, 2.4f, 0.9f, new Color(0.35f, 0.1f, 0.08f, 0.42f));
-        PlaceFloorFeature(levelRoot.transform, 0, -10, 2.7f, 1.15f, new Color(0.42f, 0.12f, 0.5f, 0.38f));
-        PlaceSupplyStation(levelRoot.transform, -2, 0, "Repair Station");
-        PlaceSupplyStation(levelRoot.transform, 0, 9, "Cooling Station");
+        if (bossArena)
+        {
+            PlaceBossArenaDressing(levelRoot.transform);
+        }
+        else
+        {
+            PlaceRoomDressing(levelRoot.transform);
+            PlaceRoomFeatures(levelRoot.transform);
+            PlaceFloorFeature(levelRoot.transform, -13, 0, 2.2f, 0.95f, new Color(0.18f, 0.5f, 0.52f, 0.5f));
+            PlaceFloorFeature(levelRoot.transform, 0, 10, 2.6f, 1.1f, new Color(0.16f, 0.75f, 0.95f, 0.42f));
+            PlaceFloorFeature(levelRoot.transform, 13, 0, 2.4f, 0.9f, new Color(0.35f, 0.1f, 0.08f, 0.42f));
+            PlaceFloorFeature(levelRoot.transform, 0, -10, 2.7f, 1.15f, new Color(0.42f, 0.12f, 0.5f, 0.38f));
+            PlaceSupplyStation(levelRoot.transform, -2, 0, "Repair Station");
+            PlaceSupplyStation(levelRoot.transform, 0, 9, "Cooling Station");
+        }
+    }
+
+    private void PlaceBossArenaDressing(Transform root)
+    {
+        PlaceTerminal(root, 0, 4, "BREAKER CORE");
+        PlaceReinforcedBarricade(root, -4, 1, false);
+        PlaceReinforcedBarricade(root, 4, 1, false);
+        PlaceReinforcedBarricade(root, -3, -2, true);
+        PlaceReinforcedBarricade(root, 3, -2, true);
+        PlaceBarrel(root, -5, 3, true);
+        PlaceBarrel(root, 5, 3, true);
+        PlaceShockField(root, -4, 0, 1.15f);
+        PlaceShockField(root, 4, 0, 1.15f);
+        PlaceSupplyStation(root, 0, -4, "Boss Arena Repair Station");
+        PlaceFloorFeature(root, 0, 0, 4.5f, 2.3f, new Color(0.55f, 0.08f, 0.12f, 0.42f));
     }
 
     private void AddRoom(int centerX, int centerY, int width, int height, bool combatRoom, int difficulty, string roomName)
@@ -1266,7 +1341,7 @@ public class GameDirector : MonoBehaviour
         PlaceCrateLine(root, 2, -9, 2, true);
         PlaceBarrel(root, -1, -12, true);
         PlaceBarrel(root, 2, -8, true);
-        PlaceTerminal(root, 0, -13, "Boss Core");
+        PlaceTerminal(root, 0, -13, "Reactor Core");
     }
 
     private void PlaceRoomFeatures(Transform root)
@@ -1303,6 +1378,7 @@ public class GameDirector : MonoBehaviour
         CircleCollider2D collider = core.AddComponent<CircleCollider2D>();
         collider.radius = 0.48f;
         collider.isTrigger = true;
+        AddReadabilityMarker(core, $"{GetSkillCoreName(skillType)}\nTOUCH: {GetSkillCoreDescription(skillType)}", GetSkillCoreColor(skillType), 1.7f, 0.9f);
         core.AddComponent<SkillCorePickup>().Configure(this, skillType);
     }
 
@@ -1344,6 +1420,7 @@ public class GameDirector : MonoBehaviour
         CircleCollider2D collider = turret.AddComponent<CircleCollider2D>();
         collider.radius = 0.34f;
         turret.AddComponent<WallMarker>();
+        AddReadabilityMarker(turret, "ALLY TURRET", new Color(0.22f, 1f, 0.72f), 1.5f, 0.85f);
         turret.AddComponent<DefenseTurret>().Configure(this);
         RegisterBlockedCell(x, y);
     }
@@ -1353,7 +1430,8 @@ public class GameDirector : MonoBehaviour
         GameObject barricade = CreateBlockingProp(root, "Reinforced Barricade", x, y, 1f, propSprites[0], -1, new Vector2(0.82f, 0.42f));
         barricade.transform.localScale = new Vector3(1.9f, 0.9f, 1f);
         barricade.transform.rotation = Quaternion.Euler(0f, 0f, horizontal ? 0f : 90f);
-        barricade.GetComponent<SpriteRenderer>().color = new Color(0.72f, 0.9f, 1f, 1f);
+        barricade.GetComponent<SpriteRenderer>().color = new Color(0.58f, 0.66f, 0.7f, 1f);
+        AddReadabilityMarker(barricade, "BARRIER", new Color(0.35f, 0.82f, 1f), 1.8f, 0.72f);
         barricade.AddComponent<DestructibleProp>().Configure(this, 92, 4, 0.06f, false);
     }
 
@@ -1379,6 +1457,8 @@ public class GameDirector : MonoBehaviour
     private void PlaceCrate(Transform root, int x, int y)
     {
         GameObject crate = CreateBlockingProp(root, "Breakable Crate", x, y, 1.05f, CrateSprite, -2, new Vector2(0.72f, 0.72f));
+        crate.GetComponent<SpriteRenderer>().color = new Color(0.82f, 0.62f, 0.3f, 1f);
+        AddReadabilityMarker(crate, "CRATE", new Color(1f, 0.72f, 0.18f), 1.25f, 0.72f);
         crate.AddComponent<DestructibleProp>().Configure(this, 36, 3, 0.08f, false);
     }
 
@@ -1386,15 +1466,22 @@ public class GameDirector : MonoBehaviour
     {
         GameObject barrel = CreateBlockingProp(root, volatileBarrel ? "Volatile Fuel Barrel" : "Scrap Barrel", x, y, 1.08f, BarrelSprite, -2, new Vector2(0.58f, 0.58f));
         barrel.GetComponent<SpriteRenderer>().color = volatileBarrel
-            ? new Color(1f, 0.55f, 0.42f, 1f)
-            : new Color(0.82f, 0.72f, 0.58f, 1f);
+            ? new Color(0.86f, 0.38f, 0.28f, 1f)
+            : new Color(0.66f, 0.58f, 0.46f, 1f);
+        AddReadabilityMarker(
+            barrel,
+            volatileBarrel ? "EXPLOSIVE" : "SCRAP BARREL",
+            volatileBarrel ? new Color(1f, 0.2f, 0.08f) : new Color(0.95f, 0.7f, 0.3f),
+            1.3f,
+            0.74f);
         barrel.AddComponent<DestructibleProp>().Configure(this, volatileBarrel ? 28 : 34, volatileBarrel ? 4 : 2, volatileBarrel ? 0.14f : 0.04f, volatileBarrel);
     }
 
     private void PlaceTerminal(Transform root, int x, int y, string terminalName)
     {
         GameObject terminal = CreateBlockingProp(root, terminalName, x, y, 1.28f, TerminalSprite, -2, new Vector2(0.56f, 0.56f));
-        terminal.GetComponent<SpriteRenderer>().color = new Color(0.58f, 1f, 0.88f, 1f);
+        terminal.GetComponent<SpriteRenderer>().color = new Color(0.42f, 0.74f, 0.68f, 1f);
+        AddReadabilityMarker(terminal, "TERMINAL", new Color(0.18f, 1f, 0.82f), 1.4f, 0.82f);
         terminal.AddComponent<DestructibleProp>().Configure(this, 58, 5, 0.16f, false);
     }
 
@@ -1416,7 +1503,9 @@ public class GameDirector : MonoBehaviour
 
     private void PlaceDecoration(Transform root, int x, int y, float scale)
     {
-        CreateBlockingProp(root, "Scrap Machinery", x, y, scale * 1.05f, propSprites[Random.Range(0, propSprites.Length)], -2, Vector2.one * 0.58f);
+        GameObject machinery = CreateBlockingProp(root, "Scrap Machinery", x, y, scale * 1.05f, propSprites[Random.Range(0, propSprites.Length)], -2, Vector2.one * 0.58f);
+        machinery.GetComponent<SpriteRenderer>().color = new Color(0.58f, 0.62f, 0.66f, 1f);
+        AddReadabilityMarker(machinery, "SOLID MACHINE", new Color(0.7f, 0.84f, 1f), 1.35f, 0.78f);
     }
 
     private void RegisterBlockedCell(int x, int y)
@@ -1445,17 +1534,109 @@ public class GameDirector : MonoBehaviour
         GameObject station = new GameObject(stationName);
         station.transform.SetParent(root);
         station.transform.position = new Vector3(x, y, -0.08f);
-        station.transform.localScale = Vector3.one * 1.9f;
+        station.transform.localScale = Vector3.one * 1.35f;
         SpriteRenderer renderer = station.AddComponent<SpriteRenderer>();
         renderer.sprite = SupplyStationSprite;
         renderer.color = stationName.Contains("Cooling")
-            ? new Color(0.52f, 0.9f, 1f, 1f)
-            : new Color(0.52f, 1f, 0.64f, 1f);
+            ? new Color(0.42f, 0.68f, 0.76f, 0.92f)
+            : new Color(0.42f, 0.72f, 0.5f, 0.92f);
         renderer.sortingOrder = 2;
         CircleCollider2D collider = station.AddComponent<CircleCollider2D>();
         collider.radius = 0.38f;
         collider.isTrigger = true;
+        AddReadabilityMarker(
+            station,
+            stationName.Contains("Cooling") ? "COOLING STATION" : "REPAIR STATION",
+            stationName.Contains("Cooling") ? new Color(0.25f, 0.85f, 1f) : new Color(0.3f, 1f, 0.48f),
+            1.65f,
+            0.86f);
         station.AddComponent<SupplyStation>().Configure(this, stationName.Contains("Cooling"));
+    }
+
+    private void AddReadabilityMarker(GameObject target, string label, Color color, float plateScale, float labelHeight)
+    {
+        GameObject labelObject = new GameObject("World Label");
+        labelObject.transform.SetParent(target.transform, false);
+        labelObject.transform.localPosition = new Vector3(0f, labelHeight, -0.32f);
+        TextMesh text = labelObject.AddComponent<TextMesh>();
+        text.text = label;
+        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.fontSize = 36;
+        text.characterSize = 0.045f;
+        text.anchor = TextAnchor.LowerCenter;
+        text.alignment = TextAlignment.Center;
+        text.color = color;
+        MeshRenderer mesh = labelObject.GetComponent<MeshRenderer>();
+        mesh.sharedMaterial = text.font.material;
+        mesh.sortingOrder = 24;
+        GameObject labelBack = new GameObject("Label Backplate");
+        labelBack.transform.SetParent(labelObject.transform, false);
+        labelBack.transform.localPosition = new Vector3(0f, 0.18f, 0.12f);
+        int longestLine = 0;
+        foreach (string line in label.Split('\n'))
+        {
+            longestLine = Mathf.Max(longestLine, line.Length);
+        }
+
+        labelBack.transform.localScale = new Vector3(Mathf.Clamp(longestLine * 0.058f, 0.72f, 2.65f), label.Contains("\n") ? 0.5f : 0.3f, 1f);
+        SpriteRenderer labelBackRenderer = labelBack.AddComponent<SpriteRenderer>();
+        labelBackRenderer.sprite = SpriteFactory.Square(new Color(0.01f, 0.015f, 0.02f, 0.78f), new Color(color.r, color.g, color.b, 0.5f));
+        labelBackRenderer.sortingOrder = 23;
+        float revealDistance = label.Contains("\n")
+            ? 3f
+            : label.Contains("STATION") || label.Contains("TURRET") ? 2f : 1.45f;
+        labelObject.AddComponent<WorldObjectLabel>().Configure(0.58f, revealDistance);
+
+        Collider2D targetCollider = target.GetComponent<Collider2D>();
+        if (targetCollider != null && !targetCollider.isTrigger)
+        {
+            target.AddComponent<ObstacleIdentity>().Configure(this, label.Split('\n')[0]);
+        }
+    }
+
+    private static string GetSkillCoreName(RoomSkillType skillType)
+    {
+        switch (skillType)
+        {
+            case RoomSkillType.KineticOverdrive:
+                return "OVERDRIVE CORE";
+            case RoomSkillType.CoolantMatrix:
+                return "COOLANT CORE";
+            case RoomSkillType.NaniteShell:
+                return "NANITE CORE";
+            default:
+                return "MAGNET CORE";
+        }
+    }
+
+    private static Color GetSkillCoreColor(RoomSkillType skillType)
+    {
+        switch (skillType)
+        {
+            case RoomSkillType.KineticOverdrive:
+                return new Color(1f, 0.55f, 0.16f);
+            case RoomSkillType.CoolantMatrix:
+                return new Color(0.22f, 0.88f, 1f);
+            case RoomSkillType.NaniteShell:
+                return new Color(0.38f, 1f, 0.48f);
+            default:
+                return new Color(0.88f, 0.48f, 1f);
+        }
+    }
+
+    private static string GetSkillCoreDescription(RoomSkillType skillType)
+    {
+        switch (skillType)
+        {
+            case RoomSkillType.KineticOverdrive:
+                return "SPEED + FIRE RATE";
+            case RoomSkillType.CoolantMatrix:
+                return "LESS WEAPON HEAT";
+            case RoomSkillType.NaniteShell:
+                return "MAX ARMOR +25";
+            default:
+                return "LARGER SCRAP MAGNET";
+        }
     }
 
     private void RemoveEditorPreviewMap()
@@ -1471,6 +1652,7 @@ public class GameDirector : MonoBehaviour
             return;
         }
 
+        existing.SetActive(false);
         Destroy(existing);
     }
 
@@ -2837,7 +3019,7 @@ public class SkillCorePickup : MonoBehaviour
         glow.transform.localPosition = new Vector3(0f, 0f, 0.08f);
         glow.transform.localScale = Vector3.one * 1.65f;
         glowRenderer = glow.AddComponent<SpriteRenderer>();
-        glowRenderer.sprite = SpriteFactory.Circle(new Color(skillColor.r, skillColor.g, skillColor.b, 0.28f), Color.clear);
+        glowRenderer.sprite = SpriteFactory.Circle(new Color(skillColor.r, skillColor.g, skillColor.b, 0.12f), Color.clear);
         glowRenderer.sortingOrder = 7;
     }
 
@@ -2853,7 +3035,7 @@ public class SkillCorePickup : MonoBehaviour
         transform.rotation = Quaternion.Euler(0f, 0f, Time.time * 42f + bobSeed * 12f);
         if (glowRenderer != null)
         {
-            glowRenderer.transform.localScale = Vector3.one * (1.55f + Mathf.Sin((Time.time + bobSeed) * 3f) * 0.18f);
+            glowRenderer.transform.localScale = Vector3.one * (1.35f + Mathf.Sin((Time.time + bobSeed) * 3f) * 0.1f);
         }
     }
 
@@ -2909,7 +3091,7 @@ public class ShockField : MonoBehaviour
         transform.localScale = Vector3.one * radius * 2f * warningPulse;
         if (spriteRenderer != null)
         {
-            spriteRenderer.color = new Color(1f, 0.32f + warningPulse * 0.12f, 0.08f, 0.52f);
+            spriteRenderer.color = new Color(0.82f, 0.24f + warningPulse * 0.08f, 0.06f, 0.24f);
         }
 
         if (Time.time < nextPulse)
@@ -2962,7 +3144,7 @@ public class ShockField : MonoBehaviour
             yield break;
         }
 
-        spriteRenderer.color = new Color(1f, 0.95f, 0.42f, 0.9f);
+        spriteRenderer.color = new Color(1f, 0.72f, 0.28f, 0.58f);
         yield return new WaitForSeconds(0.12f);
     }
 }
@@ -2983,8 +3165,8 @@ public class CoolantZone : MonoBehaviour
     {
         if (spriteRenderer != null)
         {
-            float pulse = 0.34f + Mathf.Sin(Time.time * 3.5f) * 0.08f;
-            spriteRenderer.color = new Color(0.12f, 0.78f, 1f, pulse);
+            float pulse = 0.14f + Mathf.Sin(Time.time * 3.5f) * 0.035f;
+            spriteRenderer.color = new Color(0.12f, 0.62f, 0.78f, pulse);
         }
     }
 
@@ -3133,22 +3315,44 @@ public class GameHud
 {
     private readonly PlayerController player;
     private readonly GameDirector director;
+    private readonly Image healthFill;
     private readonly Image armorFill;
     private readonly Image heatFill;
     private readonly Image damageOverlay;
     private readonly Text statusText;
-    private readonly Text statsText;
+    private readonly Text healthText;
+    private readonly Text armorText;
+    private readonly Text heatText;
+    private readonly Text resourceText;
+    private readonly Text progressText;
     private float damageFlash;
 
-    private GameHud(PlayerController playerController, GameDirector owner, Image armor, Image heat, Image damage, Text status, Text stats)
+    private GameHud(
+        PlayerController playerController,
+        GameDirector owner,
+        Image health,
+        Image armor,
+        Image heat,
+        Image damage,
+        Text status,
+        Text healthLabel,
+        Text armorLabel,
+        Text heatLabel,
+        Text resources,
+        Text progress)
     {
         player = playerController;
         director = owner;
+        healthFill = health;
         armorFill = armor;
         heatFill = heat;
         damageOverlay = damage;
         statusText = status;
-        statsText = stats;
+        healthText = healthLabel;
+        armorText = armorLabel;
+        heatText = heatLabel;
+        resourceText = resources;
+        progressText = progress;
     }
 
     public static GameHud Create(PlayerController player, GameDirector owner)
@@ -3156,42 +3360,61 @@ public class GameHud
         GameObject canvasObject = new GameObject("HUD");
         Canvas canvas = canvasObject.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvasObject.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1280f, 720f);
+        scaler.matchWidthOrHeight = 0.5f;
         canvasObject.AddComponent<GraphicRaycaster>();
 
         Image damage = CreatePanel(canvasObject.transform, "Damage Flash", Anchor.Stretch, Vector2.zero, new Vector2(0f, 0f), new Color(1f, 0f, 0f, 0f));
 
-        Text title = CreateText(canvasObject.transform, "Title", "GEAR SCAVENGER", 24, TextAnchor.UpperLeft);
-        title.rectTransform.anchorMin = new Vector2(0f, 1f);
-        title.rectTransform.anchorMax = new Vector2(0f, 1f);
-        title.rectTransform.anchoredPosition = new Vector2(24f, -18f);
-        title.rectTransform.sizeDelta = new Vector2(420f, 42f);
+        Image vitalsPanel = CreatePanel(canvasObject.transform, "Player Vitals Panel", Anchor.TopLeft, new Vector2(18f, -18f), new Vector2(410f, 238f), new Color(0.015f, 0.025f, 0.03f, 0.93f));
+        Text title = CreateText(vitalsPanel.transform, "Title", "SCAVENGER STATUS", 24, TextAnchor.UpperLeft);
+        PlaceTopLeft(title.rectTransform, new Vector2(16f, -12f), new Vector2(360f, 34f));
         title.color = new Color(0.73f, 1f, 0.95f);
 
-        Text stats = CreateText(canvasObject.transform, "Stats", "", 16, TextAnchor.UpperLeft);
-        stats.rectTransform.anchorMin = new Vector2(0f, 1f);
-        stats.rectTransform.anchorMax = new Vector2(0f, 1f);
-        stats.rectTransform.anchoredPosition = new Vector2(24f, -52f);
-        stats.rectTransform.sizeDelta = new Vector2(520f, 80f);
+        Text healthText = CreateText(vitalsPanel.transform, "Health Label", "CORE INTEGRITY", 18, TextAnchor.MiddleLeft);
+        PlaceTopLeft(healthText.rectTransform, new Vector2(16f, -52f), new Vector2(370f, 24f));
+        Image healthBack = CreatePanel(vitalsPanel.transform, "Health Bar", Anchor.TopLeft, new Vector2(16f, -78f), new Vector2(370f, 18f), new Color(0.12f, 0.025f, 0.035f, 1f));
+        Image healthFill = CreatePanel(healthBack.transform, "Health Fill", Anchor.FillLeft, Vector2.zero, Vector2.zero, new Color(1f, 0.18f, 0.24f, 1f));
 
-        Image armorBack = CreatePanel(canvasObject.transform, "Armor Bar", Anchor.TopLeft, new Vector2(24f, -122f), new Vector2(260f, 18f), new Color(0.02f, 0.05f, 0.06f, 0.85f));
-        Image armorFill = CreatePanel(armorBack.transform, "Armor Fill", Anchor.FillLeft, Vector2.zero, Vector2.zero, new Color(0.3f, 0.9f, 1f, 0.95f));
+        Text armorText = CreateText(vitalsPanel.transform, "Armor Label", "ARMOR", 18, TextAnchor.MiddleLeft);
+        PlaceTopLeft(armorText.rectTransform, new Vector2(16f, -102f), new Vector2(370f, 24f));
+        Image armorBack = CreatePanel(vitalsPanel.transform, "Armor Bar", Anchor.TopLeft, new Vector2(16f, -128f), new Vector2(370f, 18f), new Color(0.02f, 0.07f, 0.09f, 1f));
+        Image armorFill = CreatePanel(armorBack.transform, "Armor Fill", Anchor.FillLeft, Vector2.zero, Vector2.zero, new Color(0.2f, 0.86f, 1f, 1f));
 
-        Image heatBack = CreatePanel(canvasObject.transform, "Heat Bar", Anchor.TopLeft, new Vector2(24f, -148f), new Vector2(260f, 18f), new Color(0.06f, 0.035f, 0.02f, 0.85f));
-        Image heatFill = CreatePanel(heatBack.transform, "Heat Fill", Anchor.FillLeft, Vector2.zero, Vector2.zero, new Color(1f, 0.45f, 0.14f, 0.95f));
+        Text heatText = CreateText(vitalsPanel.transform, "Heat Label", "WEAPON HEAT", 18, TextAnchor.MiddleLeft);
+        PlaceTopLeft(heatText.rectTransform, new Vector2(16f, -152f), new Vector2(370f, 24f));
+        Image heatBack = CreatePanel(vitalsPanel.transform, "Heat Bar", Anchor.TopLeft, new Vector2(16f, -178f), new Vector2(370f, 18f), new Color(0.1f, 0.045f, 0.015f, 1f));
+        Image heatFill = CreatePanel(heatBack.transform, "Heat Fill", Anchor.FillLeft, Vector2.zero, Vector2.zero, new Color(1f, 0.45f, 0.14f, 1f));
 
-        Text status = CreateText(canvasObject.transform, "Status", "WASD move  |  Mouse fire  |  Space dash  |  Q Scrap Nova  |  F Magnetic Guard  |  R purge heat", 18, TextAnchor.LowerCenter);
-        status.rectTransform.anchorMin = new Vector2(0f, 0f);
-        status.rectTransform.anchorMax = new Vector2(1f, 0f);
-        status.rectTransform.anchoredPosition = new Vector2(0f, 34f);
-        status.rectTransform.sizeDelta = new Vector2(-40f, 50f);
+        Text resources = CreateText(vitalsPanel.transform, "Resources", "", 17, TextAnchor.MiddleLeft);
+        PlaceTopLeft(resources.rectTransform, new Vector2(16f, -202f), new Vector2(380f, 28f));
+        resources.color = new Color(1f, 0.9f, 0.56f);
+
+        Image missionPanel = CreatePanel(canvasObject.transform, "Mission Panel", Anchor.TopRight, new Vector2(-18f, -18f), new Vector2(385f, 218f), new Color(0.015f, 0.025f, 0.03f, 0.93f));
+        Text missionTitle = CreateText(missionPanel.transform, "Mission Title", "MISSION PROGRESS", 24, TextAnchor.UpperLeft);
+        PlaceTopLeft(missionTitle.rectTransform, new Vector2(16f, -12f), new Vector2(350f, 34f));
+        missionTitle.color = new Color(1f, 0.78f, 0.34f);
+
+        Text progress = CreateText(missionPanel.transform, "Progress", "", 18, TextAnchor.UpperLeft);
+        PlaceTopLeft(progress.rectTransform, new Vector2(16f, -52f), new Vector2(350f, 96f));
+
+        Text coreHelp = CreateText(missionPanel.transform, "Skill Core Help", "SKILL CORES\nTouch glowing labeled diamonds to automatically install their upgrade.", 17, TextAnchor.UpperLeft);
+        PlaceTopLeft(coreHelp.rectTransform, new Vector2(16f, -142f), new Vector2(350f, 66f));
+        coreHelp.color = new Color(0.7f, 0.95f, 1f);
+
+        Image statusPanel = CreatePanel(canvasObject.transform, "Status Panel", Anchor.BottomStretch, new Vector2(0f, 16f), new Vector2(-36f, 58f), new Color(0.01f, 0.02f, 0.025f, 0.92f));
+        Text status = CreateText(statusPanel.transform, "Status", "WASD move | Mouse fire | Space dash | E equip | Q Nova | F Guard | R purge", 20, TextAnchor.MiddleCenter);
+        StretchRect(status.rectTransform, new Vector2(14f, 4f), new Vector2(-14f, -4f));
         status.color = new Color(0.92f, 0.96f, 1f);
 
-        return new GameHud(player, owner, armorFill, heatFill, damage, status, stats);
+        return new GameHud(player, owner, healthFill, armorFill, heatFill, damage, status, healthText, armorText, heatText, resources, progress);
     }
 
     public void Refresh(int wave, int awakeEnemyCount, int totalEnemyCount)
     {
+        healthFill.fillAmount = Mathf.Clamp01((float)player.Health / player.MaxHealth);
         armorFill.fillAmount = Mathf.Clamp01((float)player.Armor / player.MaxArmor);
         heatFill.fillAmount = Mathf.Clamp01(player.Heat / player.MaxHeat);
         heatFill.color = player.IsOverheated ? new Color(1f, 0.08f, 0.05f) : new Color(1f, 0.45f, 0.14f);
@@ -3199,7 +3422,15 @@ public class GameHud
 
         int cores = director != null ? director.SalvageCores : 0;
         int kills = director != null ? director.DefeatedMachines : 0;
-        statsText.text = $"Armor {player.Armor}/{player.MaxArmor}   Heat {Mathf.RoundToInt(player.Heat)}%   Scrap {player.Scrap}   Nova {player.NovaScrapCost}   Guard {player.GuardScrapCost}   Cores {cores}/3   Kills {kills}   Weapon {player.WeaponName}   Wave {wave}/5   Awake {awakeEnemyCount}/{totalEnemyCount}   Pickups {pickupCount}";
+        healthText.text = $"CORE INTEGRITY        {player.Health} / {player.MaxHealth}";
+        armorText.text = $"ARMOR SHIELD          {player.Armor} / {player.MaxArmor}";
+        heatText.text = player.IsOverheated
+            ? $"WEAPON HEAT            {Mathf.RoundToInt(player.Heat)} / {Mathf.RoundToInt(player.MaxHeat)}  JAMMED"
+            : $"WEAPON HEAT            {Mathf.RoundToInt(player.Heat)} / {Mathf.RoundToInt(player.MaxHeat)}";
+        resourceText.text = $"SCRAP {player.Scrap}   WEAPON: {player.WeaponName}";
+        progressText.text = wave < 4
+            ? $"WAVE {wave} / 4\nClear all four rooms: {totalEnemyCount} remain ({awakeEnemyCount} awake)\nBoss arrives after Wave 3\nCores {cores}/3   Kills {kills}   Weapon drops {pickupCount}"
+            : $"BOSS WAVE 4 / 4\nBreaker arena enemies remaining: {totalEnemyCount}\nDestroy the Breaker to finish\nCores {cores}/3   Kills {kills}";
 
         if (damageFlash > 0f)
         {
@@ -3233,6 +3464,23 @@ public class GameHud
         return text;
     }
 
+    private static void PlaceTopLeft(RectTransform rect, Vector2 position, Vector2 size)
+    {
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 1f);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+    }
+
+    private static void StretchRect(RectTransform rect, Vector2 minOffset, Vector2 maxOffset)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = minOffset;
+        rect.offsetMax = maxOffset;
+    }
+
     private static Image CreatePanel(Transform parent, string name, Anchor anchor, Vector2 position, Vector2 size, Color color)
     {
         GameObject obj = new GameObject(name);
@@ -3255,6 +3503,21 @@ public class GameHud
             case Anchor.TopLeft:
                 rect.anchorMin = new Vector2(0f, 1f);
                 rect.anchorMax = new Vector2(0f, 1f);
+                rect.pivot = new Vector2(0f, 1f);
+                rect.anchoredPosition = position;
+                rect.sizeDelta = size;
+                break;
+            case Anchor.TopRight:
+                rect.anchorMin = new Vector2(1f, 1f);
+                rect.anchorMax = new Vector2(1f, 1f);
+                rect.pivot = new Vector2(1f, 1f);
+                rect.anchoredPosition = position;
+                rect.sizeDelta = size;
+                break;
+            case Anchor.BottomStretch:
+                rect.anchorMin = new Vector2(0f, 0f);
+                rect.anchorMax = new Vector2(1f, 0f);
+                rect.pivot = new Vector2(0.5f, 0f);
                 rect.anchoredPosition = position;
                 rect.sizeDelta = size;
                 break;
@@ -3273,6 +3536,8 @@ public class GameHud
     {
         Stretch,
         TopLeft,
+        TopRight,
+        BottomStretch,
         FillLeft
     }
 }
@@ -3339,6 +3604,70 @@ public class CameraFollow : MonoBehaviour
 
 public class WallMarker : MonoBehaviour
 {
+}
+
+public class WorldObjectLabel : MonoBehaviour
+{
+    private float worldScale = 0.72f;
+    private float revealDistance = 2.15f;
+    private PlayerController player;
+    private Renderer[] labelRenderers;
+
+    public void Configure(float scale, float distance)
+    {
+        worldScale = scale;
+        revealDistance = distance;
+    }
+
+    private void LateUpdate()
+    {
+        transform.rotation = Quaternion.identity;
+        Vector3 parentScale = transform.parent != null ? transform.parent.lossyScale : Vector3.one;
+        transform.localScale = new Vector3(
+            worldScale / Mathf.Max(0.01f, Mathf.Abs(parentScale.x)),
+            worldScale / Mathf.Max(0.01f, Mathf.Abs(parentScale.y)),
+            1f);
+
+        if (player == null)
+        {
+            player = FindObjectOfType<PlayerController>();
+        }
+
+        if (labelRenderers == null)
+        {
+            labelRenderers = GetComponentsInChildren<Renderer>(true);
+        }
+
+        bool visible = player != null && Vector2.Distance(transform.position, player.transform.position) <= revealDistance;
+        foreach (Renderer renderer in labelRenderers)
+        {
+            renderer.enabled = visible;
+        }
+    }
+}
+
+public class ObstacleIdentity : MonoBehaviour
+{
+    private GameDirector director;
+    private string displayName;
+    private float nextHintTime;
+
+    public void Configure(GameDirector owner, string obstacleName)
+    {
+        director = owner;
+        displayName = obstacleName;
+    }
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (Time.time < nextHintTime || collision.collider.GetComponent<PlayerController>() == null)
+        {
+            return;
+        }
+
+        nextHintTime = Time.time + 1.2f;
+        director?.ShowStatus($"Blocked by {displayName}", 1.1f);
+    }
 }
 
 public abstract class WeaponModule : ScriptableObject

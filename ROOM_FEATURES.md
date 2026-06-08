@@ -11,6 +11,11 @@ features are gameplay tools rather than decoration.
 | Recovered Defense Turret | Fires at awakened enemies within 6.2 units | Fight near the turret to gain extra pressure |
 | Skill Core | Grants a unique persistent or temporary upgrade | Explore each combat room before moving on |
 
+Important obstacles use restrained role colors. Labels such as `CRATE`,
+`BARRIER`, `EXPLOSIVE`, and `TERMINAL` appear only when the player is very
+close. Colliding with a solid object also displays its identity in the HUD
+status bar.
+
 ## Skill Cores
 
 | Core | Effect |
@@ -20,6 +25,10 @@ features are gameplay tools rather than decoration.
 | Nanite Shell | Permanently adds 25 maximum armor and repairs 45 armor |
 | Salvage Magnet | Permanently increases scrap pickup radius and grants 8 scrap |
 
+Skill Cores are used automatically: walk into a softly glowing core to install
+its upgrade. No interaction key is required. Its effect label appears when the
+player approaches the core.
+
 ## Room Identities
 
 - **Scrap Yard:** Open fighting space with an unstable shock field and a
@@ -28,8 +37,10 @@ features are gameplay tools rather than decoration.
   field. Route choice and explosive barrels matter.
 - **Cache Room:** A coolant recovery zone and a recovered defense turret create
   a temporary defensive stronghold.
-- **Breaker Vault:** Two shock fields and reinforced barricades create limited
-  safe lanes during the boss encounter.
+- **Reactor Yard:** Two shock fields and reinforced barricades create limited
+  safe lanes during normal waves.
+- **Isolated Breaker Arena:** Generated only after Wave 3 is cleared. Wave 4
+  takes place entirely in this dedicated Boss room.
 
 ## Visual Language
 
