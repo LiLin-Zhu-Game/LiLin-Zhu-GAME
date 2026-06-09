@@ -102,7 +102,7 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        if (dead)
+        if (dead || Time.timeScale <= 0f)
         {
             return;
         }
@@ -149,7 +149,7 @@ public class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (dead)
+        if (dead || Time.timeScale <= 0f)
         {
             body.velocity = Vector2.zero;
             return;

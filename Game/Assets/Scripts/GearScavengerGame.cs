@@ -61,6 +61,8 @@ public class GameDirector : MonoBehaviour
     private WeaponStats[] weaponTable;
     private GameObject mainMenuCanvas;
     private GameObject tutorialPanel;
+    private GameObject pauseCanvas;
+    private GameObject resultCanvas;
     private Text modeDescriptionText;
     private GameMode selectedMode = GameMode.Story;
     private int wave;
@@ -69,6 +71,7 @@ public class GameDirector : MonoBehaviour
     private int roomsCleared;
     private bool gameOver;
     private bool gameStarted;
+    private bool isPaused;
     private float statusTimer;
 
     public Sprite FloorSprite { get; private set; }
@@ -97,6 +100,7 @@ public class GameDirector : MonoBehaviour
     public int DefeatedMachines => defeatedMachines;
     public int RoomsCleared => roomsCleared;
     public bool UsingCandidateArt { get; private set; }
+    public bool IsGameplayPaused => isPaused || gameOver;
 
     private void Start()
     {
@@ -127,6 +131,8 @@ public class GameDirector : MonoBehaviour
         defeatedMachines = 0;
         roomsCleared = 0;
         gameOver = false;
+        isPaused = false;
+        Time.timeScale = 1f;
         statusTimer = 0f;
         BuildLevel(false);
         BuildPools();
@@ -165,6 +171,16 @@ public class GameDirector : MonoBehaviour
             return;
         }
 
+        if (!gameOver && Input.GetKeyDown(KeyCode.Escape))
+        {
+            SetPaused(!isPaused);
+        }
+
+        if (isPaused)
+        {
+            return;
+        }
+
         hud?.Refresh(wave, AlertEnemyCount(), activeEnemies.Count);
 
         if (statusTimer > 0f)
@@ -174,15 +190,15 @@ public class GameDirector : MonoBehaviour
             {
                 hud?.SetMessage(wave < 4
                     ? "Clear all four combat rooms to generate the next wave map"
-                    : "Boss Wave 4: destroy the Breaker in the isolated arena");
+                    : "Boss Wave 4: destroy the three Boss machines and their escorts");
             }
         }
 
-        if (gameOver && Input.GetKeyDown(KeyCode.Return))
-        {
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-        }
+    }
 
+    private void OnDestroy()
+    {
+        Time.timeScale = 1f;
     }
 
     private void CreateMainMenu()
@@ -218,7 +234,7 @@ public class GameDirector : MonoBehaviour
         title.rectTransform.anchoredPosition = new Vector2(0f, -62f);
         title.rectTransform.sizeDelta = new Vector2(900f, 78f);
 
-        Text subtitle = CreateMenuText(mainMenuCanvas.transform, "Subtitle", "Rebuild a scavenger robot, clear three sectors, then destroy the Wave 4 Breaker.  F11: fullscreen", 22, TextAnchor.MiddleCenter, new Color(0.86f, 0.92f, 0.9f));
+        Text subtitle = CreateMenuText(mainMenuCanvas.transform, "Subtitle", "Rebuild a scavenger robot, clear three sectors, then destroy the Wave 4 Boss trio.  F11: fullscreen", 22, TextAnchor.MiddleCenter, new Color(0.86f, 0.92f, 0.9f));
         subtitle.rectTransform.anchorMin = new Vector2(0.5f, 1f);
         subtitle.rectTransform.anchorMax = new Vector2(0.5f, 1f);
         subtitle.rectTransform.anchoredPosition = new Vector2(0f, -116f);
@@ -256,7 +272,7 @@ public class GameDirector : MonoBehaviour
         actionPanel.rectTransform.anchoredPosition = new Vector2(250f, -48f);
         actionPanel.rectTransform.sizeDelta = new Vector2(430f, 370f);
 
-        Text brief = CreateMenuText(actionPanel.transform, "Briefing", "MISSION BRIEFING\n\nClear three normal Waves while preserving weapons and upgrades. After Wave 3, enter the isolated Wave 4 Boss arena.\n\nSTART GAME: launch selected mode\nTUTORIAL: controls and rules\nQUIT: exit built game", 20, TextAnchor.UpperLeft, new Color(0.92f, 0.96f, 0.94f));
+        Text brief = CreateMenuText(actionPanel.transform, "Briefing", "MISSION BRIEFING\n\nClear three normal Waves while preserving weapons and upgrades. After Wave 3, enter the isolated arena and destroy three different Boss machines.\n\nSTART GAME: launch selected mode\nTUTORIAL: controls and rules\nQUIT: exit built game", 20, TextAnchor.UpperLeft, new Color(0.92f, 0.96f, 0.94f));
         brief.rectTransform.anchorMin = new Vector2(0f, 1f);
         brief.rectTransform.anchorMax = new Vector2(1f, 1f);
         brief.rectTransform.anchoredPosition = new Vector2(0f, -118f);
@@ -350,7 +366,7 @@ public class GameDirector : MonoBehaviour
         title.rectTransform.anchoredPosition = new Vector2(0f, -48f);
         title.rectTransform.sizeDelta = new Vector2(-70f, 50f);
 
-        string tutorial = "WASD: move the robot\nMouse: aim and fire\nSpace: dash through danger\nE: equip nearby weapon drops\nQ: spend 10 scrap to release Scrap Nova\nF: spend 6 scrap for Magnetic Guard\nR: purge weapon heat\nF11: toggle fullscreen\n\nDamage removes armor before core integrity. Touch Skill Cores to install upgrades. Clear all four combat rooms to generate the next map. Complete Wave 3 to enter the isolated Boss arena in Wave 4.";
+        string tutorial = "WASD: move the robot\nMouse: aim and fire\nSpace: dash through danger\nE: equip nearby weapon drops\nQ: spend 10 scrap to release Scrap Nova\nF: spend 6 scrap for Magnetic Guard\nR: purge weapon heat\nEsc: pause or resume\nF11: toggle fullscreen\n\nEntering a combat room alerts every machine in that room. Damage removes armor before core integrity. Touch Skill Cores to install upgrades. Complete Wave 3 to enter the isolated three-Boss arena in Wave 4.";
         Text body = CreateMenuText(panel.transform, "Tutorial Body", tutorial, 23, TextAnchor.UpperLeft, new Color(0.9f, 0.96f, 0.95f));
         body.rectTransform.anchorMin = new Vector2(0f, 0f);
         body.rectTransform.anchorMax = new Vector2(1f, 1f);
@@ -369,6 +385,116 @@ public class GameDirector : MonoBehaviour
     private void HideTutorial()
     {
         tutorialPanel?.SetActive(false);
+    }
+
+    private void SetPaused(bool paused)
+    {
+        if (!gameStarted || gameOver)
+        {
+            return;
+        }
+
+        isPaused = paused;
+        if (pauseCanvas == null)
+        {
+            CreatePauseMenu();
+        }
+
+        pauseCanvas.SetActive(paused);
+        Time.timeScale = paused ? 0f : 1f;
+    }
+
+    private void CreatePauseMenu()
+    {
+        EnsureEventSystem();
+        pauseCanvas = new GameObject("Pause Menu");
+        Canvas canvas = pauseCanvas.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 200;
+        CanvasScaler scaler = pauseCanvas.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1280f, 720f);
+        scaler.matchWidthOrHeight = 0.5f;
+        pauseCanvas.AddComponent<GraphicRaycaster>();
+
+        Image shade = CreateMenuImage(pauseCanvas.transform, "Pause Shade", new Color(0f, 0f, 0f, 0.78f));
+        Stretch(shade.rectTransform);
+        Image panel = CreateMenuImage(pauseCanvas.transform, "Pause Panel", new Color(0.02f, 0.035f, 0.04f, 0.98f));
+        panel.rectTransform.anchorMin = panel.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        panel.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        panel.rectTransform.anchoredPosition = Vector2.zero;
+        panel.rectTransform.sizeDelta = new Vector2(520f, 360f);
+
+        Text title = CreateMenuText(panel.transform, "Pause Title", "SYSTEM PAUSED", 42, TextAnchor.MiddleCenter, new Color(0.68f, 1f, 0.94f));
+        title.rectTransform.anchorMin = title.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+        title.rectTransform.anchoredPosition = new Vector2(0f, -62f);
+        title.rectTransform.sizeDelta = new Vector2(460f, 70f);
+        Text help = CreateMenuText(panel.transform, "Pause Help", "Combat simulation suspended\nPress Esc or select RESUME to continue", 22, TextAnchor.MiddleCenter, new Color(0.88f, 0.94f, 0.94f));
+        help.rectTransform.anchorMin = help.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+        help.rectTransform.anchoredPosition = new Vector2(0f, -135f);
+        help.rectTransform.sizeDelta = new Vector2(440f, 70f);
+
+        CreateMenuButton(panel.transform, "RESUME", new Vector2(260f, -230f), new Vector2(360f, 58f), new Color(0.08f, 0.52f, 0.45f, 0.98f), () => SetPaused(false));
+        CreateMenuButton(panel.transform, "RETURN TO MAIN MENU", new Vector2(260f, -302f), new Vector2(360f, 54f), new Color(0.34f, 0.2f, 0.14f, 0.98f), ReturnToMainMenu);
+        pauseCanvas.SetActive(false);
+    }
+
+    private void FinishMission(bool victory)
+    {
+        if (gameOver)
+        {
+            return;
+        }
+
+        gameOver = true;
+        isPaused = false;
+        Time.timeScale = 0f;
+        CreateResultScreen(victory);
+    }
+
+    private void CreateResultScreen(bool victory)
+    {
+        EnsureEventSystem();
+        resultCanvas = new GameObject(victory ? "Mission Complete Screen" : "Mission Failed Screen");
+        Canvas canvas = resultCanvas.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 250;
+        CanvasScaler scaler = resultCanvas.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1280f, 720f);
+        scaler.matchWidthOrHeight = 0.5f;
+        resultCanvas.AddComponent<GraphicRaycaster>();
+
+        Image shade = CreateMenuImage(resultCanvas.transform, "Result Shade", new Color(0f, 0f, 0f, 0.86f));
+        Stretch(shade.rectTransform);
+        Image panel = CreateMenuImage(resultCanvas.transform, "Result Panel", new Color(0.018f, 0.035f, 0.04f, 0.99f));
+        panel.rectTransform.anchorMin = panel.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        panel.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        panel.rectTransform.anchoredPosition = Vector2.zero;
+        panel.rectTransform.sizeDelta = new Vector2(680f, 470f);
+
+        string titleText = victory ? "MISSION COMPLETE" : "SCAVENGER DESTROYED";
+        Color titleColor = victory ? new Color(0.55f, 1f, 0.78f) : new Color(1f, 0.28f, 0.2f);
+        Text title = CreateMenuText(panel.transform, "Result Title", titleText, 50, TextAnchor.MiddleCenter, titleColor);
+        title.rectTransform.anchorMin = title.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+        title.rectTransform.anchoredPosition = new Vector2(0f, -68f);
+        title.rectTransform.sizeDelta = new Vector2(620f, 78f);
+
+        string summary = victory
+            ? "The Breaker, Siege Titan, and Reactor Warden have been destroyed.\nThe mechanical sector is secure."
+            : "Core integrity reached zero before the Boss sector was secured.";
+        Text body = CreateMenuText(panel.transform, "Result Summary", $"{summary}\n\nWaves reached: {wave} / 4\nMachines defeated: {defeatedMachines}\nSalvage cores recovered: {salvageCores} / 3\nFinal weapon: {(player != null ? player.WeaponName : "None")}", 24, TextAnchor.MiddleCenter, new Color(0.9f, 0.96f, 0.94f));
+        body.rectTransform.anchorMin = body.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+        body.rectTransform.anchoredPosition = new Vector2(0f, -225f);
+        body.rectTransform.sizeDelta = new Vector2(590f, 230f);
+
+        CreateMenuButton(panel.transform, "RETURN TO MAIN MENU", new Vector2(340f, -410f), new Vector2(420f, 60f), new Color(0.08f, 0.52f, 0.45f, 0.98f), ReturnToMainMenu);
+    }
+
+    private void ReturnToMainMenu()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
     private void QuitGame()
@@ -390,13 +516,13 @@ public class GameDirector : MonoBehaviour
         switch (selectedMode)
         {
             case GameMode.Challenge:
-                modeDescriptionText.text = "Challenge Mode: the normal mission plus an extra opening attack group. More enemies immediately; Boss still arrives in Wave 4.";
+                modeDescriptionText.text = "Challenge Mode: the normal mission plus an extra opening attack group. More enemies immediately; the three-Boss arena still arrives in Wave 4.";
                 break;
             case GameMode.Training:
                 modeDescriptionText.text = "Training Mode: two extra random weapons spawn at the start. Best for learning controls and demonstrating weapon variety.";
                 break;
             default:
-                modeDescriptionText.text = "Story Mode: standard enemy counts and rewards. Clear Waves 1-3, then fight the Boss in Wave 4.";
+                modeDescriptionText.text = "Story Mode: standard enemy counts and rewards. Clear Waves 1-3, then fight three different Boss machines in Wave 4.";
                 break;
         }
     }
@@ -427,11 +553,11 @@ public class GameDirector : MonoBehaviour
         switch (selectedMode)
         {
             case GameMode.Challenge:
-                return "Challenge Mode: extra opening enemies. Clear three normal Waves, then defeat the Wave 4 Boss.";
+                return "Challenge Mode: extra opening enemies. Clear three normal Waves, then defeat the Wave 4 Boss trio.";
             case GameMode.Training:
-                return "Training Mode: extra starting weapons. Clear three normal Waves, then defeat the Wave 4 Boss.";
+                return "Training Mode: extra starting weapons. Clear three normal Waves, then defeat the Wave 4 Boss trio.";
             default:
-                return "Story Mode: clear three normal Waves, collect 3 salvage cores, then defeat the Wave 4 Boss.";
+                return "Story Mode: clear three normal Waves, collect 3 salvage cores, then defeat the Wave 4 Boss trio.";
         }
     }
 
@@ -519,7 +645,7 @@ public class GameDirector : MonoBehaviour
     public void RewardEnemyDefeat(EnemyKind kind, Vector2 position)
     {
         defeatedMachines++;
-        int bonusScrap = kind == EnemyKind.Boss ? 10
+        int bonusScrap = IsBossKind(kind) ? 10
             : kind == EnemyKind.Bulwark ? 6
             : kind == EnemyKind.Support || kind == EnemyKind.Artillery ? 4
             : 2;
@@ -535,6 +661,11 @@ public class GameDirector : MonoBehaviour
             pickup.Configure(ToNearestFloorPoint(position + Random.insideUnitCircle * 1.2f), reward);
             ShowStatus($"Scavenged upgrade: {reward.Name}", 2.2f);
         }
+    }
+
+    private static bool IsBossKind(EnemyKind kind)
+    {
+        return kind == EnemyKind.Boss || kind == EnemyKind.SiegeBoss || kind == EnemyKind.ReactorBoss;
     }
 
     public void SpawnRoomWeaponDrops(int count)
@@ -690,8 +821,8 @@ public class GameDirector : MonoBehaviour
 
     public void PlayerDied()
     {
-        gameOver = true;
-        hud?.SetMessage("Core integrity destroyed. Press Enter to rebuild the scavenger.");
+        hud?.SetMessage("Core integrity destroyed.");
+        FinishMission(false);
     }
 
     public void PlayPurgeEffect(Vector2 position, float radius)
@@ -720,8 +851,8 @@ public class GameDirector : MonoBehaviour
 
             if (wave >= 4)
             {
-                gameOver = true;
-                hud?.SetMessage("BREAKER DESTROYED - mission complete. Press Enter to replay.");
+                hud?.SetMessage("BOSS TRIO DESTROYED - mission complete.");
+                FinishMission(true);
                 yield break;
             }
 
@@ -740,7 +871,7 @@ public class GameDirector : MonoBehaviour
             if (isBossWave)
             {
                 SpawnBossWave();
-                ShowStatus("BOSS WAVE 4: destroy the Breaker in the isolated arena", 3f);
+                ShowStatus("BOSS WAVE 4: destroy the three Boss machines and their escorts", 3f);
             }
             else
             {
@@ -825,14 +956,12 @@ public class GameDirector : MonoBehaviour
     private void SpawnBossWave()
     {
         RoomDefinition room = GetBossRoom();
-        SpawnEnemy(EnemyKind.Boss, PickRoomFloorPoint(room, Vector2.zero));
-        SpawnEnemy(EnemyKind.Support, PickRoomFloorPoint(room, new Vector2(0f, -2.2f)));
-        SpawnEnemy(EnemyKind.Artillery, PickRoomFloorPoint(room, new Vector2(-2.6f, 1.6f)));
-        SpawnEnemy(EnemyKind.Artillery, PickRoomFloorPoint(room, new Vector2(2.6f, 1.6f)));
-        SpawnEnemy(EnemyKind.Bulwark, PickRoomFloorPoint(room, new Vector2(-3f, -0.8f)));
-        SpawnEnemy(EnemyKind.Bulwark, PickRoomFloorPoint(room, new Vector2(3f, -0.8f)));
-        SpawnEnemy(EnemyKind.Chaser, PickRoomFloorPoint(room, new Vector2(-3.2f, 0f)));
-        SpawnEnemy(EnemyKind.Chaser, PickRoomFloorPoint(room, new Vector2(3.2f, 0f)));
+        SpawnEnemy(EnemyKind.Boss, PickRoomFloorPoint(room, new Vector2(0f, 2.2f)));
+        SpawnEnemy(EnemyKind.SiegeBoss, PickRoomFloorPoint(room, new Vector2(-5f, 0f)));
+        SpawnEnemy(EnemyKind.ReactorBoss, PickRoomFloorPoint(room, new Vector2(5f, 0f)));
+        SpawnEnemy(EnemyKind.Support, PickRoomFloorPoint(room, new Vector2(0f, -1.8f)));
+        SpawnEnemy(EnemyKind.Artillery, PickRoomFloorPoint(room, new Vector2(-5f, 3.8f)));
+        SpawnEnemy(EnemyKind.Artillery, PickRoomFloorPoint(room, new Vector2(5f, 3.8f)));
     }
 
     private Vector2 PickSpawnPoint(float minDistance, float maxDistance)
@@ -1157,7 +1286,7 @@ public class GameDirector : MonoBehaviour
 
         if (bossArena)
         {
-            AddRoom(0, 0, 14, 10, true, 3, "Isolated Breaker Arena");
+            AddRoom(0, 0, 18, 12, true, 3, "Isolated Boss Arena");
         }
         else
         {
@@ -2166,7 +2295,9 @@ public enum EnemyKind
     Support,
     Bulwark,
     Artillery,
-    Boss
+    Boss,
+    SiegeBoss,
+    ReactorBoss
 }
 
 public class EnemyController : MonoBehaviour
@@ -2195,7 +2326,6 @@ public class EnemyController : MonoBehaviour
     private float environmentSlowTimer;
     private float environmentSlowMultiplier = 1f;
     private int attackPattern;
-    private float wakeDistance;
     private Vector2 spawnPosition;
     private Vector2 homeCenter;
     private int homeWidth = 10;
@@ -2276,20 +2406,41 @@ public class EnemyController : MonoBehaviour
                 baseTint = new Color(0.96f, 0.82f, 1f, 1f);
                 healthBarWidth = 1f;
                 break;
-            default:
-                health = maxHealth = 480;
+            case EnemyKind.Boss:
+                health = maxHealth = 620;
                 speed = 1.75f;
                 spriteRenderer.sprite = director.BossSprite;
                 spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 2.2f : 3.7f);
                 baseTint = new Color(1f, 0.88f, 0.86f, 1f);
                 healthBarWidth = 1.8f;
                 break;
+            case EnemyKind.SiegeBoss:
+                health = maxHealth = 780;
+                speed = 1.3f;
+                spriteRenderer.sprite = director.BulwarkSprite;
+                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 2.35f : 4.25f);
+                baseTint = new Color(0.58f, 0.76f, 1f, 1f);
+                healthBarWidth = 2.2f;
+                break;
+            case EnemyKind.ReactorBoss:
+                health = maxHealth = 540;
+                speed = 2.1f;
+                spriteRenderer.sprite = director.ArtillerySprite;
+                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 2.15f : 3.9f);
+                baseTint = new Color(1f, 0.5f, 0.92f, 1f);
+                healthBarWidth = 1.9f;
+                break;
+            default:
+                health = maxHealth = 64;
+                speed = 3.35f;
+                spriteRenderer.sprite = director.ChaserSprite;
+                spriteRenderer.transform.localScale = Vector3.one * (director.UsingCandidateArt ? 1.35f : 2.75f);
+                baseTint = Color.white;
+                healthBarWidth = 0.95f;
+                break;
         }
 
-        wakeDistance = kind == EnemyKind.Boss ? 9.2f
-            : kind == EnemyKind.Drone || kind == EnemyKind.Artillery ? 7.6f
-            : kind == EnemyKind.Bulwark ? 6.2f
-            : 6.6f;
+        gameObject.name = GetDisplayName();
         spriteRenderer.enabled = true;
         spriteRenderer.color = baseTint * 0.62f;
         shadowRenderer.enabled = true;
@@ -2383,7 +2534,7 @@ public class EnemyController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (!active || player == null || player.IsDead)
+        if (!active || player == null || player.IsDead || Time.timeScale <= 0f)
         {
             body.velocity = Vector2.zero;
             return;
@@ -2411,14 +2562,14 @@ public class EnemyController : MonoBehaviour
             currentSpeed *= environmentSlowMultiplier;
         }
 
-        if (kind == EnemyKind.Boss && health <= maxHealth / 2)
+        if (IsBossKind() && health <= maxHealth / 2)
         {
-            currentSpeed *= 1.25f;
+            currentSpeed *= kind == EnemyKind.SiegeBoss ? 1.15f : 1.25f;
         }
 
-        if (kind == EnemyKind.Bulwark && chargeTimer > 0f && playerInsideHome)
+        if ((kind == EnemyKind.Bulwark || kind == EnemyKind.SiegeBoss) && chargeTimer > 0f && playerInsideHome)
         {
-            body.velocity = direction * currentSpeed * 3.8f;
+            body.velocity = direction * currentSpeed * (kind == EnemyKind.SiegeBoss ? 4.4f : 3.8f);
         }
         else if (!playerInsideHome && distance < 0.45f)
         {
@@ -2444,6 +2595,15 @@ public class EnemyController : MonoBehaviour
         {
             body.velocity = Vector2.zero;
         }
+        else if (kind == EnemyKind.ReactorBoss && playerInsideHome && distance < 5.2f)
+        {
+            body.velocity = -direction * currentSpeed * 0.8f;
+        }
+        else if (kind == EnemyKind.ReactorBoss && playerInsideHome && distance < 7.2f)
+        {
+            Vector2 strafe = new Vector2(-direction.y, direction.x);
+            body.velocity = strafe * currentSpeed * 0.75f;
+        }
         else
         {
             body.velocity = direction * currentSpeed;
@@ -2457,7 +2617,7 @@ public class EnemyController : MonoBehaviour
 
     private void Update()
     {
-        if (!active || player == null || player.IsDead)
+        if (!active || player == null || player.IsDead || Time.timeScale <= 0f)
         {
             return;
         }
@@ -2478,7 +2638,7 @@ public class EnemyController : MonoBehaviour
         bool playerInsideHome = IsInsideHomeRoom(player.transform.position, PlayerRoomEntryMargin);
         if (playerInsideHome)
         {
-            if (kind == EnemyKind.Drone || kind == EnemyKind.Artillery || kind == EnemyKind.Boss)
+            if (kind == EnemyKind.Drone || kind == EnemyKind.Artillery || IsBossKind())
             {
                 shootTimer -= Time.deltaTime;
                 if (shootTimer <= 0f)
@@ -2493,10 +2653,20 @@ public class EnemyController : MonoBehaviour
                         FireArtilleryBarrage();
                         shootTimer = 2.45f;
                     }
-                    else
+                    else if (kind == EnemyKind.Boss)
                     {
                         FireBossPattern();
                         shootTimer = health <= maxHealth / 2 ? 0.72f : 1.05f;
+                    }
+                    else if (kind == EnemyKind.SiegeBoss)
+                    {
+                        FireSiegeBossPattern();
+                        shootTimer = health <= maxHealth / 2 ? 0.9f : 1.35f;
+                    }
+                    else
+                    {
+                        FireReactorBossPattern();
+                        shootTimer = health <= maxHealth / 2 ? 0.26f : 0.38f;
                     }
                 }
             }
@@ -2512,6 +2682,12 @@ public class EnemyController : MonoBehaviour
                 chargeTimer = 0.65f;
                 abilityTimer = 3.8f;
             }
+
+            if (kind == EnemyKind.SiegeBoss && abilityTimer <= 0f && Vector2.Distance(player.transform.position, transform.position) <= 9f)
+            {
+                chargeTimer = health <= maxHealth / 2 ? 0.85f : 0.7f;
+                abilityTimer = health <= maxHealth / 2 ? 2.4f : 3.2f;
+            }
         }
         else
         {
@@ -2524,7 +2700,7 @@ public class EnemyController : MonoBehaviour
             float pulse = 0.8f + Mathf.Sin(supportPulseTimer * 8f) * 0.2f;
             spriteRenderer.color = new Color(pulse, 1f, pulse, 1f);
         }
-        else if (kind == EnemyKind.Bulwark && chargeTimer > 0f)
+        else if ((kind == EnemyKind.Bulwark || kind == EnemyKind.SiegeBoss) && chargeTimer > 0f)
         {
             spriteRenderer.color = Color.Lerp(baseTint, Color.white, 0.55f);
         }
@@ -2551,9 +2727,9 @@ public class EnemyController : MonoBehaviour
             amount = Mathf.Max(1, Mathf.CeilToInt(amount * 0.48f));
             knockbackResistance = 0.2f;
         }
-        else if (kind == EnemyKind.Boss)
+        else if (IsBossKind())
         {
-            knockbackResistance = 0.45f;
+            knockbackResistance = kind == EnemyKind.SiegeBoss ? 0.12f : 0.35f;
         }
 
         health -= amount;
@@ -2573,7 +2749,7 @@ public class EnemyController : MonoBehaviour
         }
 
         float healthRatio = maxHealth > 0 ? Mathf.Clamp01((float)health / maxHealth) : 0f;
-        float barHeight = kind == EnemyKind.Boss ? 0.09f : 0.075f;
+        float barHeight = IsBossKind() ? 0.1f : 0.075f;
         healthBackRenderer.transform.localScale = new Vector3(healthBarWidth, barHeight, 1f);
         healthFillRenderer.transform.localScale = new Vector3(Mathf.Max(0.04f, healthBarWidth * healthRatio), barHeight * 0.62f, 1f);
         healthFillRenderer.transform.localPosition = new Vector3(-(healthBarWidth - healthBarWidth * healthRatio) * 0.5f, 0.94f, -0.09f);
@@ -2647,6 +2823,56 @@ public class EnemyController : MonoBehaviour
         attackPattern++;
     }
 
+    private void FireSiegeBossPattern()
+    {
+        Vector2 direction = (player.transform.position - transform.position).normalized;
+        bool secondPhase = health <= maxHealth / 2;
+        if (attackPattern % 2 == 0)
+        {
+            for (int angle = -36; angle <= 36; angle += 18)
+            {
+                Vector2 shotDirection = Quaternion.Euler(0f, 0f, angle) * direction;
+                FireEnemyBullet(shotDirection, secondPhase ? 8.8f : 7.6f, secondPhase ? 12 : 10, 2.8f);
+            }
+        }
+        else
+        {
+            int projectileCount = secondPhase ? 16 : 12;
+            for (int i = 0; i < projectileCount; i++)
+            {
+                float angle = i * (360f / projectileCount);
+                Vector2 radialDirection = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad));
+                FireEnemyBullet(radialDirection, 5.5f, 9, 3.2f);
+            }
+        }
+
+        attackPattern++;
+    }
+
+    private void FireReactorBossPattern()
+    {
+        bool secondPhase = health <= maxHealth / 2;
+        int arms = secondPhase ? 4 : 2;
+        float angleOffset = Time.time * (secondPhase ? 150f : 105f) + attackPattern * 17f;
+        for (int i = 0; i < arms; i++)
+        {
+            float angle = angleOffset + i * (360f / arms);
+            Vector2 spiralDirection = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad));
+            FireEnemyBullet(spiralDirection, secondPhase ? 8.2f : 7.2f, 7, 3f);
+        }
+
+        if (attackPattern % (secondPhase ? 5 : 7) == 0)
+        {
+            Vector2 aimed = (player.transform.position - transform.position).normalized;
+            for (int angle = -18; angle <= 18; angle += 18)
+            {
+                FireEnemyBullet(Quaternion.Euler(0f, 0f, angle) * aimed, 10.5f, 10, 2.4f);
+            }
+        }
+
+        attackPattern++;
+    }
+
     private void FireEnemyBullet(Vector2 direction, float bulletSpeed, int damage, float lifetime)
     {
         Vector2 normalized = direction.sqrMagnitude > 0.01f ? direction.normalized : Vector2.right;
@@ -2682,9 +2908,7 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        float playerDistance = Vector2.Distance(player.transform.position, transform.position);
-        float spawnDistance = Vector2.Distance(player.transform.position, spawnPosition);
-        if (IsInsideHomeRoom(player.transform.position, PlayerRoomEntryMargin) && (playerDistance <= wakeDistance || spawnDistance <= wakeDistance))
+        if (IsInsideHomeRoom(player.transform.position, PlayerRoomEntryMargin))
         {
             WakeUp();
         }
@@ -2702,7 +2926,7 @@ public class EnemyController : MonoBehaviour
         shootTimer = Random.Range(0.35f, 0.9f);
         spriteRenderer.color = baseTint;
         markerRenderer.color = new Color(1f, 0.08f, 0.05f, 0.95f);
-        director?.ShowStatus($"{kind} machine awakened in {homeName}", 0.9f);
+        director?.ShowStatus($"{GetDisplayName()} awakened in {homeName}", 0.9f);
     }
 
     private bool IsInsideHomeRoom(Vector2 point, float margin)
@@ -2713,6 +2937,36 @@ public class EnemyController : MonoBehaviour
             && point.x <= homeCenter.x + halfWidth
             && point.y >= homeCenter.y - halfHeight
             && point.y <= homeCenter.y + halfHeight;
+    }
+
+    private bool IsBossKind()
+    {
+        return kind == EnemyKind.Boss || kind == EnemyKind.SiegeBoss || kind == EnemyKind.ReactorBoss;
+    }
+
+    private string GetDisplayName()
+    {
+        switch (kind)
+        {
+            case EnemyKind.Boss:
+                return "Breaker Boss";
+            case EnemyKind.SiegeBoss:
+                return "Siege Titan";
+            case EnemyKind.ReactorBoss:
+                return "Reactor Warden";
+            case EnemyKind.Chaser:
+                return "Ripper Chaser";
+            case EnemyKind.Drone:
+                return "Hornet Drone";
+            case EnemyKind.Support:
+                return "Scarab Support";
+            case EnemyKind.Bulwark:
+                return "Centipede Bulwark";
+            case EnemyKind.Artillery:
+                return "Wasp Artillery";
+            default:
+                return "Hostile Machine";
+        }
     }
 
     private Vector2 GetHomeAnchor(Vector2 enemyPosition)
@@ -2754,7 +3008,9 @@ public class EnemyController : MonoBehaviour
         if (hitPlayer != null && contactTimer <= 0f && IsInsideHomeRoom(hitPlayer.transform.position, PlayerRoomEntryMargin))
         {
             WakeUp();
-            int contactDamage = kind == EnemyKind.Boss ? 24
+            int contactDamage = kind == EnemyKind.SiegeBoss ? 30
+                : kind == EnemyKind.ReactorBoss ? 18
+                : kind == EnemyKind.Boss ? 24
                 : kind == EnemyKind.Bulwark ? 22
                 : kind == EnemyKind.Chaser ? 13
                 : 8;
@@ -2787,14 +3043,14 @@ public class EnemyController : MonoBehaviour
             shadowRenderer.enabled = false;
         }
 
-        int scrapValue = kind == EnemyKind.Boss ? 12 : Mathf.Max(2, maxHealth / 24);
+        int scrapValue = IsBossKind() ? 12 : Mathf.Max(2, maxHealth / 24);
         for (int i = 0; i < scrapValue; i++)
         {
             director.SpawnScrap(deathPosition, 1);
         }
 
         director.RewardEnemyDefeat(kind, deathPosition);
-        director.TrySpawnWeaponDrop(deathPosition, kind == EnemyKind.Boss ? 1f : 0.18f);
+        director.TrySpawnWeaponDrop(deathPosition, IsBossKind() ? 1f : 0.18f);
         director.ReleaseEnemy(this);
     }
 }
@@ -3087,6 +3343,11 @@ public class ShockField : MonoBehaviour
 
     private void Update()
     {
+        if (Time.timeScale <= 0f)
+        {
+            return;
+        }
+
         float warningPulse = 0.9f + Mathf.Sin(Time.time * 7f) * 0.1f;
         transform.localScale = Vector3.one * radius * 2f * warningPulse;
         if (spriteRenderer != null)
@@ -3206,6 +3467,11 @@ public class DefenseTurret : MonoBehaviour
 
     private void Update()
     {
+        if (Time.timeScale <= 0f)
+        {
+            return;
+        }
+
         if (player == null)
         {
             player = FindObjectOfType<PlayerController>();
@@ -3405,7 +3671,7 @@ public class GameHud
         coreHelp.color = new Color(0.7f, 0.95f, 1f);
 
         Image statusPanel = CreatePanel(canvasObject.transform, "Status Panel", Anchor.BottomStretch, new Vector2(0f, 16f), new Vector2(-36f, 58f), new Color(0.01f, 0.02f, 0.025f, 0.92f));
-        Text status = CreateText(statusPanel.transform, "Status", "WASD move | Mouse fire | Space dash | E equip | Q Nova | F Guard | R purge", 20, TextAnchor.MiddleCenter);
+        Text status = CreateText(statusPanel.transform, "Status", "WASD move | Mouse fire | Space dash | E equip | Q Nova | F Guard | R purge | Esc pause", 20, TextAnchor.MiddleCenter);
         StretchRect(status.rectTransform, new Vector2(14f, 4f), new Vector2(-14f, -4f));
         status.color = new Color(0.92f, 0.96f, 1f);
 
@@ -3430,7 +3696,7 @@ public class GameHud
         resourceText.text = $"SCRAP {player.Scrap}   WEAPON: {player.WeaponName}";
         progressText.text = wave < 4
             ? $"WAVE {wave} / 4\nClear all four rooms: {totalEnemyCount} remain ({awakeEnemyCount} awake)\nBoss arrives after Wave 3\nCores {cores}/3   Kills {kills}   Weapon drops {pickupCount}"
-            : $"BOSS WAVE 4 / 4\nBreaker arena enemies remaining: {totalEnemyCount}\nDestroy the Breaker to finish\nCores {cores}/3   Kills {kills}";
+            : $"BOSS WAVE 4 / 4\nBoss arena enemies remaining: {totalEnemyCount}\nDestroy all three Bosses and their escorts\nCores {cores}/3   Kills {kills}";
 
         if (damageFlash > 0f)
         {

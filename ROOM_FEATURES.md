@@ -39,8 +39,9 @@ player approaches the core.
   a temporary defensive stronghold.
 - **Reactor Yard:** Two shock fields and reinforced barricades create limited
   safe lanes during normal waves.
-- **Isolated Breaker Arena:** Generated only after Wave 3 is cleared. Wave 4
-  takes place entirely in this dedicated Boss room.
+- **Isolated Boss Arena:** Generated only after Wave 3 is cleared. Wave 4 takes
+  place entirely in this larger dedicated room against the Breaker, Siege
+  Titan, Reactor Warden, one support machine, and two artillery enemies.
 
 ## Visual Language
 

@@ -48,3 +48,6 @@ Game/Assets/ArtCandidates/**/*.7z
 Game/Assets/ArtCandidates/**/*.zip.meta
 Game/Assets/ArtCandidates/**/*.rar.meta
 Game/Assets/ArtCandidates/**/*.7z.meta
+
+# Local presentation and revision materials; do not publish with the game build.
+游戏讲解/
