@@ -52,6 +52,11 @@ public class PlayerController : MonoBehaviour
     private int scrap;
     private bool overheated;
     private bool dead;
+    private Vector3 visualBasePosition;
+    private Vector3 visualBaseScale = Vector3.one;
+    private float movementCycle;
+    private float fireKickTimer;
+    private float hitFlashTimer;
 
     public int Health => health;
     public int MaxHealth => maxHealth;
@@ -64,6 +69,7 @@ public class PlayerController : MonoBehaviour
     public Vector2 AimDirection => aimDirection;
     public bool IsDead => dead;
     public string WeaponName => weapon != null ? weapon.CurrentWeaponName : "None";
+    public WeaponStats CurrentWeaponStats => weapon != null ? weapon.CurrentStats : null;
     public int NovaScrapCost => novaScrapCost;
     public int GuardScrapCost => guardScrapCost;
     public float FireDelayMultiplier => overdriveTimer > 0f ? 0.72f : 1f;
@@ -71,6 +77,11 @@ public class PlayerController : MonoBehaviour
     public void SetBodyRenderer(SpriteRenderer bodyRenderer)
     {
         spriteRenderer = bodyRenderer;
+        if (spriteRenderer != null)
+        {
+            visualBasePosition = spriteRenderer.transform.localPosition;
+            visualBaseScale = spriteRenderer.transform.localScale;
+        }
     }
 
     public void Initialize(GameDirector owner, WeaponController playerWeapon)
@@ -113,6 +124,7 @@ public class PlayerController : MonoBehaviour
         CoolHeat();
         PullScrapIn();
         CheckWeaponPickup();
+        AnimateVisuals();
 
         if (Input.GetMouseButton(0) && weapon != null && !overheated)
         {
@@ -193,6 +205,7 @@ public class PlayerController : MonoBehaviour
         armor -= absorbed;
         health = Mathf.Max(0, health - (finalDamage - absorbed));
         director.FlashDamage();
+        hitFlashTimer = 0.18f;
         if (health <= 0)
         {
             dead = true;
@@ -249,6 +262,12 @@ public class PlayerController : MonoBehaviour
 
         weapon.ApplyWeapon(stats);
         director.ShowStatus($"Equipped {stats.Name}", 2f);
+        director.HideWeaponComparison();
+    }
+
+    public void NotifyWeaponFired()
+    {
+        fireKickTimer = 0.12f;
     }
 
     public void ApplyRoomSkill(RoomSkillType skillType)
@@ -418,7 +437,7 @@ public class PlayerController : MonoBehaviour
             guardTimer = Mathf.Max(0f, guardTimer - Time.deltaTime);
         }
 
-        if (spriteRenderer != null)
+        if (spriteRenderer != null && hitFlashTimer <= 0f)
         {
             spriteRenderer.color = guardTimer > 0f
                 ? new Color(0.64f, 1f, 0.95f, 1f)
@@ -471,6 +490,55 @@ public class PlayerController : MonoBehaviour
         if (nearbyWeapon != null)
         {
             director.ShowStatus($"Press E to equip {nearbyWeapon.DisplayName}", 0.08f);
+            director.ShowWeaponComparison(CurrentWeaponStats, nearbyWeapon.Stats);
+        }
+        else
+        {
+            director.HideWeaponComparison();
+        }
+    }
+
+    private void AnimateVisuals()
+    {
+        if (spriteRenderer == null)
+        {
+            return;
+        }
+
+        bool moving = moveInput.sqrMagnitude > 0.05f;
+        movementCycle += Time.deltaTime * (moving ? 11f : 3f);
+        fireKickTimer = Mathf.Max(0f, fireKickTimer - Time.deltaTime);
+        hitFlashTimer = Mathf.Max(0f, hitFlashTimer - Time.deltaTime);
+
+        float step = moving ? Mathf.Sin(movementCycle) : Mathf.Sin(movementCycle) * 0.22f;
+        float bob = moving ? Mathf.Abs(step) * 0.055f : step * 0.012f;
+        float kick = fireKickTimer > 0f ? fireKickTimer / 0.12f : 0f;
+        float hitKick = hitFlashTimer > 0f ? hitFlashTimer / 0.18f : 0f;
+
+        Vector3 targetPosition = visualBasePosition + new Vector3(
+            -aimDirection.x * kick * 0.07f,
+            bob - aimDirection.y * kick * 0.04f,
+            0f);
+        float horizontalStretch = moving ? 1f + Mathf.Abs(moveInput.x) * 0.035f : 1f;
+        float verticalSquash = moving ? 1f - Mathf.Abs(step) * 0.035f : 1f;
+        Vector3 targetScale = Vector3.Scale(visualBaseScale, new Vector3(
+            horizontalStretch + hitKick * 0.06f,
+            verticalSquash - hitKick * 0.04f,
+            1f));
+        float directionLean = moving ? -moveInput.x * 4.5f + moveInput.y * step * 1.6f : 0f;
+        float recoilLean = -aimDirection.y * kick * 2.5f;
+
+        Transform visual = spriteRenderer.transform;
+        visual.localPosition = Vector3.Lerp(visual.localPosition, targetPosition, Time.deltaTime * 18f);
+        visual.localScale = Vector3.Lerp(visual.localScale, targetScale, Time.deltaTime * 18f);
+        visual.localRotation = Quaternion.Slerp(
+            visual.localRotation,
+            Quaternion.Euler(0f, 0f, directionLean + recoilLean),
+            Time.deltaTime * 16f);
+
+        if (hitFlashTimer > 0f)
+        {
+            spriteRenderer.color = Color.Lerp(Color.white, new Color(1f, 0.32f, 0.22f, 1f), hitKick);
         }
     }
 
@@ -478,6 +546,7 @@ public class PlayerController : MonoBehaviour
     {
         transform.position = new Vector3(position.x, position.y, 0f);
         nearbyWeapon = null;
+        director.HideWeaponComparison();
         dashTimer = 0f;
         if (body != null)
         {

@@ -38,6 +38,7 @@ weapon drops, feedback, and the main menu.
 
 ### 13. Add directional player animation
 
+- Status: Done
 - Priority: Should-have
 - Area: Art
 - Sprint: Vertical Slice 1
@@ -45,9 +46,12 @@ weapon drops, feedback, and the main menu.
   - Player movement displays directional animation.
   - Shooting and movement can play without visual snapping.
   - Animation does not affect collision or movement speed.
+- Evidence: `PlayerController` animates only the visual child with directional
+  lean, movement bob, firing recoil, and hit feedback.
 
 ### 14. Add enemy attack and damage animation
 
+- Status: Done
 - Priority: Should-have
 - Area: Enemies
 - Sprint: Vertical Slice 1
@@ -55,9 +59,12 @@ weapon drops, feedback, and the main menu.
   - Chaser, drone, and support attacks have distinct anticipation.
   - Hit and death feedback is visible.
   - Animation events cannot cause duplicate damage.
+- Evidence: enemy visual anticipation, hit flash, and death collapse are
+  code-driven; attack damage remains in the existing timers and collision code.
 
 ### 15. Build modular weapon selection UI
 
+- Status: Done
 - Priority: Must-have
 - Area: Weapons
 - Sprint: Vertical Slice 1
@@ -65,6 +72,8 @@ weapon drops, feedback, and the main menu.
   - Player can compare and equip weapon drops during a run.
   - Heat, damage, fire rate, and projectile behavior are displayed.
   - Selection does not break the combat loop.
+- Evidence: approaching a weapon opens a non-pausing comparison panel with
+  damage, fire rate, heat, and projectile behavior; E equips it.
 
 ### 16. Polish boss encounter
 
@@ -78,6 +87,7 @@ weapon drops, feedback, and the main menu.
 
 ### 17. Add final HUD and tutorial messaging
 
+- Status: Done
 - Priority: Should-have
 - Area: UI
 - Sprint: Polish
@@ -85,9 +95,12 @@ weapon drops, feedback, and the main menu.
   - Health, armor, heat, scrap, weapon, and objective are readable.
   - Controls and purge behavior are explained during the first run.
   - Debug-only HUD text is removed from the release view.
+- Evidence: the runtime HUD displays player vitals, weapon heat, resources,
+  Wave objective, skill-core help, controls, pause state, and mission result.
 
 ### 18. Add combat audio and ambience
 
+- Status: Cut from release scope
 - Priority: Could-have
 - Area: Audio
 - Sprint: Polish
@@ -98,6 +111,7 @@ weapon drops, feedback, and the main menu.
 
 ### 19. Create release build and playtest checklist
 
+- Status: Done
 - Priority: Must-have
 - Area: Release
 - Sprint: Release
@@ -105,3 +119,5 @@ weapon drops, feedback, and the main menu.
   - A clean five-minute run can be completed from menu to boss victory.
   - No blocking console errors occur.
   - Build, controls, credits, licenses, and known issues are documented.
+- Evidence: Training Mode provides the short full-flow route; the Unity release
+  readiness menu and repository release documents cover the remaining checks.

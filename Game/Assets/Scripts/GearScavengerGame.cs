@@ -254,7 +254,7 @@ public class GameDirector : MonoBehaviour
 
         CreateModeButton(modePanel.transform, "Story Mode", "Balanced mission", new Vector2(215f, -102f), GameMode.Story);
         CreateModeButton(modePanel.transform, "Challenge Mode", "More enemies, faster pressure", new Vector2(215f, -172f), GameMode.Challenge);
-        CreateModeButton(modePanel.transform, "Training Mode", "Extra weapon drops for practice", new Vector2(215f, -242f), GameMode.Training);
+        CreateModeButton(modePanel.transform, "Training Mode", "Short five-minute rehearsal", new Vector2(215f, -242f), GameMode.Training);
 
         modeDescriptionText = CreateMenuText(modePanel.transform, "Mode Description", "", 20, TextAnchor.UpperLeft, new Color(0.86f, 0.94f, 0.9f));
         modeDescriptionText.rectTransform.anchorMin = new Vector2(0f, 0f);
@@ -519,7 +519,7 @@ public class GameDirector : MonoBehaviour
                 modeDescriptionText.text = "Challenge Mode: the normal mission plus an extra opening attack group. More enemies immediately; the three-Boss arena still arrives in Wave 4.";
                 break;
             case GameMode.Training:
-                modeDescriptionText.text = "Training Mode: two extra random weapons spawn at the start. Best for learning controls and demonstrating weapon variety.";
+                modeDescriptionText.text = "Training Mode: reduced room squads and extra starting weapons. Best for a five-minute release check or presentation rehearsal.";
                 break;
             default:
                 modeDescriptionText.text = "Story Mode: standard enemy counts and rewards. Clear Waves 1-3, then fight three different Boss machines in Wave 4.";
@@ -555,7 +555,7 @@ public class GameDirector : MonoBehaviour
             case GameMode.Challenge:
                 return "Challenge Mode: extra opening enemies. Clear three normal Waves, then defeat the Wave 4 Boss trio.";
             case GameMode.Training:
-                return "Training Mode: extra starting weapons. Clear three normal Waves, then defeat the Wave 4 Boss trio.";
+                return "Training Mode: reduced squads and extra weapons. Rehearse the full menu-to-Boss flow in about five minutes.";
             default:
                 return "Story Mode: clear three normal Waves, collect 3 salvage cores, then defeat the Wave 4 Boss trio.";
         }
@@ -725,8 +725,14 @@ public class GameDirector : MonoBehaviour
         float ry = Mathf.Max(1.4f, room.Height * 0.24f);
 
         SpawnEnemy(EnemyKind.Chaser, PickRoomFloorPoint(room, new Vector2(-rx, -ry)));
-        SpawnEnemy(EnemyKind.Chaser, PickRoomFloorPoint(room, new Vector2(rx, -ry)));
         SpawnEnemy(EnemyKind.Drone, PickRoomFloorPoint(room, new Vector2(0f, ry)));
+
+        if (selectedMode == GameMode.Training)
+        {
+            return;
+        }
+
+        SpawnEnemy(EnemyKind.Chaser, PickRoomFloorPoint(room, new Vector2(rx, -ry)));
 
         if (includeSupport || room.Difficulty >= 2)
         {
@@ -752,6 +758,16 @@ public class GameDirector : MonoBehaviour
     {
         hud?.SetMessage(message);
         statusTimer = seconds;
+    }
+
+    public void ShowWeaponComparison(WeaponStats current, WeaponStats candidate)
+    {
+        hud?.ShowWeaponComparison(current, candidate);
+    }
+
+    public void HideWeaponComparison()
+    {
+        hud?.HideWeaponComparison();
     }
 
     private void CreateHudSafely()
@@ -876,7 +892,11 @@ public class GameDirector : MonoBehaviour
             else
             {
                 SpawnGuaranteedRoomEnemies();
-                SpawnExtraWavePressure(wave);
+                if (selectedMode != GameMode.Training)
+                {
+                    SpawnExtraWavePressure(wave);
+                }
+
                 SpawnRoomWeaponDrops(1);
                 ShowStatus($"WAVE {wave}: clear all four combat rooms", 2.5f);
             }
@@ -2108,6 +2128,7 @@ public class WeaponController : MonoBehaviour
     private Vector2 lastAimDirection = Vector2.right;
 
     public string CurrentWeaponName => equippedStats != null ? equippedStats.Name : "Rust Rifle";
+    public WeaponStats CurrentStats => equippedStats;
     private float FireDelay => equippedStats != null ? equippedStats.FireDelay : core != null ? core.FireDelay : 0.14f;
     private float HeatPerShot => equippedStats != null ? equippedStats.HeatPerShot : core != null ? core.HeatPerShot : 9.5f;
     private int Damage => equippedStats != null ? equippedStats.Damage : ammo != null ? ammo.Damage : 18;
@@ -2224,6 +2245,8 @@ public class WeaponController : MonoBehaviour
             Bullet bullet = director.GetPlayerBullet();
             bullet.Fire(muzzle, shotDirection, BulletSpeed, Damage, BulletLifetime);
         }
+
+        player.NotifyWeaponFired();
     }
 
     private void LateUpdate()
@@ -2286,6 +2309,22 @@ public class WeaponStats
         PelletCount = pelletCount;
         BulletLifetime = bulletLifetime;
     }
+
+    public int VolleyDamage => Damage * Mathf.Max(1, PelletCount);
+    public float ShotsPerSecond => FireDelay > 0f ? 1f / FireDelay : 0f;
+    public float EffectiveRange => BulletSpeed * BulletLifetime;
+
+    public string ProjectileDescription()
+    {
+        if (PelletCount > 1)
+        {
+            return $"{PelletCount} pellets / {SpreadDegrees:0.#} deg spread / {EffectiveRange:0.#} range";
+        }
+
+        return SpreadDegrees >= 5f
+            ? $"single unstable shot / {SpreadDegrees:0.#} deg spread / {EffectiveRange:0.#} range"
+            : $"single precision shot / {SpreadDegrees:0.#} deg spread / {EffectiveRange:0.#} range";
+    }
 }
 
 public enum EnemyKind
@@ -2308,6 +2347,7 @@ public class EnemyController : MonoBehaviour
     private GameDirector director;
     private PlayerController player;
     private Rigidbody2D body;
+    private Collider2D bodyCollider;
     private SpriteRenderer spriteRenderer;
     private SpriteRenderer shadowRenderer;
     private SpriteRenderer markerRenderer;
@@ -2334,12 +2374,17 @@ public class EnemyController : MonoBehaviour
     private Color baseTint = Color.white;
     private bool active;
     private bool awakened;
+    private bool dying;
+    private float hitFlashTimer;
+    private Vector3 visualBasePosition;
+    private Vector3 visualBaseScale = Vector3.one;
 
     public bool IsAwake => active && awakened;
 
     private void Awake()
     {
         body = GetComponent<Rigidbody2D>();
+        bodyCollider = GetComponent<Collider2D>();
         EnsureVisuals();
     }
 
@@ -2348,13 +2393,26 @@ public class EnemyController : MonoBehaviour
         director = owner;
         player = target;
         kind = enemyKind;
+        StopAllCoroutines();
         EnsureVisuals();
+        if (bodyCollider == null)
+        {
+            bodyCollider = GetComponent<Collider2D>();
+        }
+
+        if (bodyCollider != null)
+        {
+            bodyCollider.enabled = true;
+        }
+
         transform.position = new Vector3(position.x, position.y, 0f);
         transform.localScale = Vector3.one;
         spawnPosition = position;
         body.velocity = Vector2.zero;
         active = true;
         awakened = false;
+        dying = false;
+        hitFlashTimer = 0f;
         contactTimer = 0.25f;
         shootTimer = Random.Range(0.45f, 1.1f);
         supportPulseTimer = Random.Range(0f, 1f);
@@ -2441,6 +2499,10 @@ public class EnemyController : MonoBehaviour
         }
 
         gameObject.name = GetDisplayName();
+        spriteRenderer.transform.localPosition = new Vector3(0f, 0f, -0.04f);
+        visualBasePosition = spriteRenderer.transform.localPosition;
+        visualBaseScale = spriteRenderer.transform.localScale;
+        spriteRenderer.transform.localRotation = Quaternion.identity;
         spriteRenderer.enabled = true;
         spriteRenderer.color = baseTint * 0.62f;
         shadowRenderer.enabled = true;
@@ -2711,6 +2773,8 @@ public class EnemyController : MonoBehaviour
                 ? Color.Lerp(baseTint, new Color(0.65f, 1f, 0.65f, 1f), 0.45f)
                 : new Color(baseTint.r * chasePulse, baseTint.g * chasePulse, baseTint.b * chasePulse, 1f);
         }
+
+        AnimateCombatVisuals(playerInsideHome);
     }
 
     public void TakeDamage(int amount, Vector2 knockback)
@@ -2733,6 +2797,7 @@ public class EnemyController : MonoBehaviour
         }
 
         health -= amount;
+        hitFlashTimer = 0.16f;
         body.AddForce(knockback * knockbackResistance, ForceMode2D.Impulse);
         RefreshHealthBar();
         if (health <= 0)
@@ -2783,6 +2848,70 @@ public class EnemyController : MonoBehaviour
     {
         Vector2 direction = (player.transform.position - transform.position).normalized;
         FireEnemyBullet(direction, 8.8f, 9, 2.1f);
+    }
+
+    private void AnimateCombatVisuals(bool playerInsideHome)
+    {
+        if (spriteRenderer == null)
+        {
+            return;
+        }
+
+        hitFlashTimer = Mathf.Max(0f, hitFlashTimer - Time.deltaTime);
+        float pulse = 0f;
+        Vector3 scaleMultiplier = Vector3.one;
+        float rotation = 0f;
+        Color targetColor = spriteRenderer.color;
+        float playerDistance = player != null ? Vector2.Distance(transform.position, player.transform.position) : float.MaxValue;
+
+        if (kind == EnemyKind.Chaser && playerInsideHome && playerDistance <= 2.2f && contactTimer <= 0.34f)
+        {
+            pulse = 0.5f + Mathf.Sin(Time.time * 22f) * 0.5f;
+            scaleMultiplier = new Vector3(1.12f, 0.88f, 1f);
+            rotation = spriteRenderer.flipX ? 7f : -7f;
+            targetColor = Color.Lerp(baseTint, new Color(1f, 0.28f, 0.18f, 1f), 0.45f + pulse * 0.25f);
+        }
+        else if (kind == EnemyKind.Drone && playerInsideHome && shootTimer <= 0.3f)
+        {
+            pulse = Mathf.Clamp01(1f - shootTimer / 0.3f);
+            scaleMultiplier = new Vector3(0.9f, 1.12f + pulse * 0.08f, 1f);
+            targetColor = Color.Lerp(baseTint, new Color(1f, 0.72f, 0.18f, 1f), pulse);
+        }
+        else if (kind == EnemyKind.Support && playerInsideHome && abilityTimer <= 0.5f)
+        {
+            pulse = Mathf.Clamp01(1f - abilityTimer / 0.5f);
+            float supportScale = 1f + pulse * 0.18f;
+            scaleMultiplier = new Vector3(supportScale, supportScale, 1f);
+            rotation = Mathf.Sin(Time.time * 18f) * 3f;
+            targetColor = Color.Lerp(baseTint, new Color(0.35f, 1f, 0.55f, 1f), pulse);
+        }
+        else if ((kind == EnemyKind.Bulwark || kind == EnemyKind.SiegeBoss) && chargeTimer > 0f)
+        {
+            scaleMultiplier = new Vector3(1.16f, 0.86f, 1f);
+            targetColor = Color.Lerp(baseTint, Color.white, 0.65f);
+        }
+        else if ((kind == EnemyKind.Artillery || IsBossKind()) && playerInsideHome && shootTimer <= 0.28f)
+        {
+            pulse = Mathf.Clamp01(1f - shootTimer / 0.28f);
+            scaleMultiplier = new Vector3(0.92f, 1.08f + pulse * 0.08f, 1f);
+            targetColor = Color.Lerp(baseTint, Color.white, pulse * 0.75f);
+        }
+
+        if (hitFlashTimer > 0f)
+        {
+            float hit = hitFlashTimer / 0.16f;
+            scaleMultiplier = new Vector3(1f + hit * 0.13f, 1f - hit * 0.08f, 1f);
+            rotation += Mathf.Sin(hit * Mathf.PI) * (spriteRenderer.flipX ? -7f : 7f);
+            targetColor = Color.Lerp(baseTint, Color.white, hit);
+        }
+
+        Transform visual = spriteRenderer.transform;
+        Vector3 targetScale = Vector3.Scale(visualBaseScale, scaleMultiplier);
+        Vector3 targetPosition = visualBasePosition + new Vector3(0f, pulse * 0.035f, 0f);
+        visual.localScale = Vector3.Lerp(visual.localScale, targetScale, Time.deltaTime * 20f);
+        visual.localPosition = Vector3.Lerp(visual.localPosition, targetPosition, Time.deltaTime * 20f);
+        visual.localRotation = Quaternion.Slerp(visual.localRotation, Quaternion.Euler(0f, 0f, rotation), Time.deltaTime * 20f);
+        spriteRenderer.color = Color.Lerp(spriteRenderer.color, targetColor, Time.deltaTime * 24f);
     }
 
     private void FireArtilleryBarrage()
@@ -3021,7 +3150,19 @@ public class EnemyController : MonoBehaviour
 
     private void Die()
     {
+        if (dying)
+        {
+            return;
+        }
+
+        dying = true;
         active = false;
+        body.velocity = Vector2.zero;
+        if (bodyCollider != null)
+        {
+            bodyCollider.enabled = false;
+        }
+
         Vector2 deathPosition = transform.position;
         if (markerRenderer != null)
         {
@@ -3036,6 +3177,28 @@ public class EnemyController : MonoBehaviour
         if (healthFillRenderer != null)
         {
             healthFillRenderer.gameObject.SetActive(false);
+        }
+
+        StartCoroutine(DeathRoutine(deathPosition));
+    }
+
+    private IEnumerator DeathRoutine(Vector2 deathPosition)
+    {
+        Vector3 startScale = spriteRenderer != null ? spriteRenderer.transform.localScale : Vector3.one;
+        float elapsed = 0f;
+        const float duration = 0.3f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.transform.localScale = Vector3.Lerp(startScale * 1.18f, startScale * 0.18f, t);
+                spriteRenderer.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(0f, spriteRenderer.flipX ? -85f : 85f, t));
+                spriteRenderer.color = Color.Lerp(Color.white, new Color(baseTint.r, baseTint.g * 0.25f, baseTint.b * 0.18f, 0f), t);
+            }
+
+            yield return null;
         }
 
         if (shadowRenderer != null)
@@ -3591,6 +3754,8 @@ public class GameHud
     private readonly Text heatText;
     private readonly Text resourceText;
     private readonly Text progressText;
+    private readonly GameObject weaponComparePanel;
+    private readonly Text weaponCompareText;
     private float damageFlash;
 
     private GameHud(
@@ -3605,7 +3770,9 @@ public class GameHud
         Text armorLabel,
         Text heatLabel,
         Text resources,
-        Text progress)
+        Text progress,
+        GameObject comparisonPanel,
+        Text comparisonText)
     {
         player = playerController;
         director = owner;
@@ -3619,6 +3786,8 @@ public class GameHud
         heatText = heatLabel;
         resourceText = resources;
         progressText = progress;
+        weaponComparePanel = comparisonPanel;
+        weaponCompareText = comparisonText;
     }
 
     public static GameHud Create(PlayerController player, GameDirector owner)
@@ -3670,12 +3839,20 @@ public class GameHud
         PlaceTopLeft(coreHelp.rectTransform, new Vector2(16f, -142f), new Vector2(350f, 66f));
         coreHelp.color = new Color(0.7f, 0.95f, 1f);
 
+        Image comparisonPanel = CreatePanel(canvasObject.transform, "Weapon Comparison Panel", Anchor.TopRight, new Vector2(-18f, -252f), new Vector2(385f, 252f), new Color(0.015f, 0.025f, 0.03f, 0.95f));
+        Text comparisonTitle = CreateText(comparisonPanel.transform, "Comparison Title", "WEAPON COMPARISON", 22, TextAnchor.UpperLeft);
+        PlaceTopLeft(comparisonTitle.rectTransform, new Vector2(16f, -12f), new Vector2(350f, 30f));
+        comparisonTitle.color = new Color(0.42f, 0.92f, 1f);
+        Text comparison = CreateText(comparisonPanel.transform, "Comparison", "", 16, TextAnchor.UpperLeft);
+        PlaceTopLeft(comparison.rectTransform, new Vector2(16f, -48f), new Vector2(350f, 192f));
+        comparisonPanel.gameObject.SetActive(false);
+
         Image statusPanel = CreatePanel(canvasObject.transform, "Status Panel", Anchor.BottomStretch, new Vector2(0f, 16f), new Vector2(-36f, 58f), new Color(0.01f, 0.02f, 0.025f, 0.92f));
         Text status = CreateText(statusPanel.transform, "Status", "WASD move | Mouse fire | Space dash | E equip | Q Nova | F Guard | R purge | Esc pause", 20, TextAnchor.MiddleCenter);
         StretchRect(status.rectTransform, new Vector2(14f, 4f), new Vector2(-14f, -4f));
         status.color = new Color(0.92f, 0.96f, 1f);
 
-        return new GameHud(player, owner, healthFill, armorFill, heatFill, damage, status, healthText, armorText, heatText, resources, progress);
+        return new GameHud(player, owner, healthFill, armorFill, heatFill, damage, status, healthText, armorText, heatText, resources, progress, comparisonPanel.gameObject, comparison);
     }
 
     public void Refresh(int wave, int awakeEnemyCount, int totalEnemyCount)
@@ -3713,6 +3890,51 @@ public class GameHud
     public void FlashDamage()
     {
         damageFlash = 1f;
+    }
+
+    public void ShowWeaponComparison(WeaponStats current, WeaponStats candidate)
+    {
+        if (weaponComparePanel == null || weaponCompareText == null || candidate == null)
+        {
+            return;
+        }
+
+        weaponComparePanel.SetActive(true);
+        if (current == null)
+        {
+            weaponCompareText.text =
+                $"CANDIDATE: {candidate.Name}\n" +
+                $"Volley damage: {candidate.VolleyDamage}\n" +
+                $"Fire rate: {candidate.ShotsPerSecond:0.0} shots/s\n" +
+                $"Heat: {candidate.HeatPerShot:0.#} / shot\n" +
+                $"Projectile: {candidate.ProjectileDescription()}\n\n" +
+                "Press E to equip. Combat remains active.";
+            return;
+        }
+
+        weaponCompareText.text =
+            $"CURRENT: {current.Name}\n" +
+            $"CANDIDATE: {candidate.Name}\n\n" +
+            $"Volley damage: {current.VolleyDamage} -> {candidate.VolleyDamage}  {FormatDelta(candidate.VolleyDamage - current.VolleyDamage)}\n" +
+            $"Fire rate: {current.ShotsPerSecond:0.0} -> {candidate.ShotsPerSecond:0.0}/s  {FormatDelta(candidate.ShotsPerSecond - current.ShotsPerSecond)}\n" +
+            $"Heat / shot: {current.HeatPerShot:0.#} -> {candidate.HeatPerShot:0.#}  {FormatDelta(current.HeatPerShot - candidate.HeatPerShot)} efficiency\n" +
+            $"Projectile: {candidate.ProjectileDescription()}\n\n" +
+            "Press E to equip. Combat remains active.";
+    }
+
+    public void HideWeaponComparison()
+    {
+        weaponComparePanel?.SetActive(false);
+    }
+
+    private static string FormatDelta(float delta)
+    {
+        if (Mathf.Abs(delta) < 0.05f)
+        {
+            return "(same)";
+        }
+
+        return delta > 0f ? $"(+{delta:0.#})" : $"({delta:0.#})";
     }
 
     private static Text CreateText(Transform parent, string name, string content, int size, TextAnchor alignment)
