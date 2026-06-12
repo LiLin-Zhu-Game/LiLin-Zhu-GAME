@@ -1,6 +1,6 @@
 # Gear Scavenger
 
-![Gear Scavenger Gameplay](game_prototype.png)
+![Gear Scavenger Gameplay](Gear_Scavenger.png)
 
 **Gear Scavenger** is a top-down robot combat game developed with Unity.  
 The player controls a scavenger robot exploring abandoned mechanical facilities, fighting hostile machines, collecting scrap, discovering new weapons, and installing powerful Skill Core upgrades.
