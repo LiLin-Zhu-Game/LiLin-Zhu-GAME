@@ -216,71 +216,82 @@ public class GameDirector : MonoBehaviour
 
         Image background = CreateMenuImage(mainMenuCanvas.transform, "Wasteland Background", Color.clear);
         Stretch(background.rectTransform);
-        background.color = new Color(0.035f, 0.045f, 0.05f, 1f);
+        background.color = new Color(0.018f, 0.027f, 0.031f, 1f);
 
-        Image floorBand = CreateMenuImage(mainMenuCanvas.transform, "Workshop Floor Band", new Color(0.09f, 0.12f, 0.11f, 1f));
-        floorBand.rectTransform.anchorMin = new Vector2(0f, 0f);
-        floorBand.rectTransform.anchorMax = new Vector2(1f, 0.36f);
-        floorBand.rectTransform.offsetMin = Vector2.zero;
-        floorBand.rectTransform.offsetMax = Vector2.zero;
+        Image topBand = CreateMenuImage(mainMenuCanvas.transform, "Top System Band", new Color(0.035f, 0.065f, 0.068f, 1f));
+        topBand.rectTransform.anchorMin = new Vector2(0f, 1f);
+        topBand.rectTransform.anchorMax = new Vector2(1f, 1f);
+        topBand.rectTransform.pivot = new Vector2(0.5f, 1f);
+        topBand.rectTransform.sizeDelta = new Vector2(0f, 34f);
+        topBand.rectTransform.anchoredPosition = Vector2.zero;
 
-        CreateMenuDecoration(mainMenuCanvas.transform, new Vector2(-360f, -246f), new Vector2(430f, 16f), new Color(0.34f, 0.21f, 0.12f, 0.85f), -8f);
-        CreateMenuDecoration(mainMenuCanvas.transform, new Vector2(340f, -242f), new Vector2(430f, 16f), new Color(0.24f, 0.36f, 0.35f, 0.85f), 8f);
-        CreateMenuDecoration(mainMenuCanvas.transform, new Vector2(0f, -286f), new Vector2(720f, 10f), new Color(0.55f, 0.18f, 0.1f, 0.55f), 0f);
+        Image lowerBand = CreateMenuImage(mainMenuCanvas.transform, "Lower Machine Deck", new Color(0.025f, 0.045f, 0.046f, 1f));
+        lowerBand.rectTransform.anchorMin = new Vector2(0f, 0f);
+        lowerBand.rectTransform.anchorMax = new Vector2(1f, 0.24f);
+        lowerBand.rectTransform.offsetMin = Vector2.zero;
+        lowerBand.rectTransform.offsetMax = Vector2.zero;
 
-        Text title = CreateMenuText(mainMenuCanvas.transform, "Title", "GEAR SCAVENGER", 56, TextAnchor.MiddleCenter, new Color(0.68f, 1f, 0.94f));
+        for (int i = 0; i < 9; i++)
+        {
+            float x = -560f + i * 140f;
+            CreateMenuDecoration(mainMenuCanvas.transform, new Vector2(x, -292f), new Vector2(96f, 5f), new Color(0.2f, 0.48f, 0.46f, 0.22f), 0f);
+        }
+
+        CreateMenuDecoration(mainMenuCanvas.transform, new Vector2(-530f, 310f), new Vector2(150f, 4f), new Color(1f, 0.62f, 0.2f, 0.8f), 0f);
+        CreateMenuDecoration(mainMenuCanvas.transform, new Vector2(530f, 310f), new Vector2(150f, 4f), new Color(0.28f, 0.92f, 0.82f, 0.8f), 0f);
+
+        Text systemStatus = CreateMenuText(mainMenuCanvas.transform, "System Status", "SCAVENGER NETWORK // SECTOR 07", 14, TextAnchor.MiddleLeft, new Color(0.55f, 0.78f, 0.75f));
+        PlaceMenuTopLeft(systemStatus.rectTransform, new Vector2(28f, -5f), new Vector2(380f, 24f));
+        Text buildStatus = CreateMenuText(mainMenuCanvas.transform, "Build Status", "CORE ONLINE   |   F11 FULLSCREEN", 14, TextAnchor.MiddleRight, new Color(0.55f, 0.78f, 0.75f));
+        PlaceMenuTopRight(buildStatus.rectTransform, new Vector2(-28f, -5f), new Vector2(380f, 24f));
+
+        Text title = CreateMenuText(mainMenuCanvas.transform, "Title", "GEAR SCAVENGER", 54, TextAnchor.MiddleCenter, new Color(0.69f, 1f, 0.94f));
         title.rectTransform.anchorMin = new Vector2(0.5f, 1f);
         title.rectTransform.anchorMax = new Vector2(0.5f, 1f);
-        title.rectTransform.anchoredPosition = new Vector2(0f, -62f);
+        title.rectTransform.anchoredPosition = new Vector2(0f, -72f);
         title.rectTransform.sizeDelta = new Vector2(900f, 78f);
+        AddTextShadow(title, new Color(0f, 0.45f, 0.4f, 0.6f), new Vector2(3f, -3f));
 
-        Text subtitle = CreateMenuText(mainMenuCanvas.transform, "Subtitle", "Rebuild a scavenger robot, clear three sectors, then destroy the Wave 4 Boss trio.  F11: fullscreen", 22, TextAnchor.MiddleCenter, new Color(0.86f, 0.92f, 0.9f));
+        Text subtitle = CreateMenuText(mainMenuCanvas.transform, "Subtitle", "SALVAGE. REBUILD. BREAK THE MACHINE CORE.", 17, TextAnchor.MiddleCenter, new Color(0.72f, 0.82f, 0.8f));
         subtitle.rectTransform.anchorMin = new Vector2(0.5f, 1f);
         subtitle.rectTransform.anchorMax = new Vector2(0.5f, 1f);
-        subtitle.rectTransform.anchoredPosition = new Vector2(0f, -116f);
+        subtitle.rectTransform.anchoredPosition = new Vector2(0f, -120f);
         subtitle.rectTransform.sizeDelta = new Vector2(980f, 42f);
 
-        Image modePanel = CreateMenuImage(mainMenuCanvas.transform, "Mode Panel", new Color(0.018f, 0.03f, 0.034f, 0.94f));
-        modePanel.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-        modePanel.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-        modePanel.rectTransform.anchoredPosition = new Vector2(-250f, -48f);
-        modePanel.rectTransform.sizeDelta = new Vector2(430f, 370f);
+        Image modePanel = CreateMenuFrame(mainMenuCanvas.transform, "Mode Panel", new Vector2(-270f, -72f), new Vector2(480f, 420f), new Color(0.022f, 0.045f, 0.049f, 0.98f), new Color(0.18f, 0.5f, 0.48f, 0.72f));
+        CreatePanelHeader(modePanel.transform, "01 // SELECT DEPLOYMENT MODE", new Color(1f, 0.76f, 0.34f));
 
-        Text modeTitle = CreateMenuText(modePanel.transform, "Mode Title", "SELECT MODE", 30, TextAnchor.MiddleCenter, new Color(1f, 0.86f, 0.52f));
-        modeTitle.rectTransform.anchorMin = new Vector2(0f, 1f);
-        modeTitle.rectTransform.anchorMax = new Vector2(1f, 1f);
-        modeTitle.rectTransform.anchoredPosition = new Vector2(0f, -38f);
-        modeTitle.rectTransform.sizeDelta = new Vector2(-40f, 42f);
+        CreateModeButton(modePanel.transform, "STORY MODE", "Balanced sector-clearing mission", new Vector2(240f, -100f), GameMode.Story);
+        CreateModeButton(modePanel.transform, "CHALLENGE MODE", "Extra opening pressure and enemies", new Vector2(240f, -171f), GameMode.Challenge);
+        CreateModeButton(modePanel.transform, "TRAINING MODE", "Short full-flow presentation route", new Vector2(240f, -242f), GameMode.Training);
 
-        CreateModeButton(modePanel.transform, "Story Mode", "Balanced mission", new Vector2(215f, -102f), GameMode.Story);
-        CreateModeButton(modePanel.transform, "Challenge Mode", "More enemies, faster pressure", new Vector2(215f, -172f), GameMode.Challenge);
-        CreateModeButton(modePanel.transform, "Training Mode", "Short five-minute rehearsal", new Vector2(215f, -242f), GameMode.Training);
-
-        modeDescriptionText = CreateMenuText(modePanel.transform, "Mode Description", "", 20, TextAnchor.UpperLeft, new Color(0.86f, 0.94f, 0.9f));
-        modeDescriptionText.rectTransform.anchorMin = new Vector2(0f, 0f);
-        modeDescriptionText.rectTransform.anchorMax = new Vector2(1f, 0f);
-        modeDescriptionText.rectTransform.anchoredPosition = new Vector2(0f, 46f);
-        modeDescriptionText.rectTransform.sizeDelta = new Vector2(-54f, 64f);
-        modeDescriptionText.rectTransform.offsetMin = new Vector2(28f, modeDescriptionText.rectTransform.offsetMin.y);
-        modeDescriptionText.rectTransform.offsetMax = new Vector2(-28f, modeDescriptionText.rectTransform.offsetMax.y);
+        Image descriptionBack = CreateMenuTopLeftFrame(modePanel.transform, "Mode Intel Background", new Vector2(33f, -286f), new Vector2(414f, 104f), new Color(0.012f, 0.026f, 0.029f, 0.96f), new Color(0.12f, 0.3f, 0.3f, 0.75f));
+        modeDescriptionText = CreateMenuText(descriptionBack.transform, "Mode Description", "", 16, TextAnchor.MiddleLeft, new Color(0.82f, 0.93f, 0.9f));
+        StretchWithPadding(modeDescriptionText.rectTransform, 16f, 10f);
         UpdateModeDescription();
         UpdateModeButtonVisuals();
 
-        Image actionPanel = CreateMenuImage(mainMenuCanvas.transform, "Action Panel", new Color(0.018f, 0.03f, 0.034f, 0.94f));
-        actionPanel.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-        actionPanel.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-        actionPanel.rectTransform.anchoredPosition = new Vector2(250f, -48f);
-        actionPanel.rectTransform.sizeDelta = new Vector2(430f, 370f);
+        Image actionPanel = CreateMenuFrame(mainMenuCanvas.transform, "Action Panel", new Vector2(270f, -72f), new Vector2(520f, 420f), new Color(0.022f, 0.045f, 0.049f, 0.98f), new Color(0.18f, 0.5f, 0.48f, 0.72f));
+        CreatePanelHeader(actionPanel.transform, "02 // MISSION BRIEFING", new Color(0.43f, 0.94f, 0.84f));
 
-        Text brief = CreateMenuText(actionPanel.transform, "Briefing", "MISSION BRIEFING\n\nClear three normal Waves while preserving weapons and upgrades. After Wave 3, enter the isolated arena and destroy three different Boss machines.\n\nSTART GAME: launch selected mode\nTUTORIAL: controls and rules\nQUIT: exit built game", 20, TextAnchor.UpperLeft, new Color(0.92f, 0.96f, 0.94f));
-        brief.rectTransform.anchorMin = new Vector2(0f, 1f);
-        brief.rectTransform.anchorMax = new Vector2(1f, 1f);
-        brief.rectTransform.anchoredPosition = new Vector2(0f, -118f);
-        brief.rectTransform.sizeDelta = new Vector2(-56f, 190f);
+        Text objectiveLabel = CreateMenuText(actionPanel.transform, "Objective Label", "PRIMARY OBJECTIVE", 14, TextAnchor.MiddleLeft, new Color(1f, 0.72f, 0.28f));
+        PlaceMenuTopLeft(objectiveLabel.rectTransform, new Vector2(28f, -78f), new Vector2(220f, 24f));
+        Text brief = CreateMenuText(actionPanel.transform, "Briefing", "Clear three machine sectors while preserving scavenged weapons and upgrades. Enter Wave 4 and destroy the Breaker, Siege Titan, and Reactor Warden.", 16, TextAnchor.UpperLeft, new Color(0.9f, 0.96f, 0.94f));
+        PlaceMenuTopLeft(brief.rectTransform, new Vector2(28f, -106f), new Vector2(464f, 78f));
 
-        CreateMenuButton(actionPanel.transform, "START GAME", new Vector2(215f, -244f), new Vector2(350f, 62f), new Color(0.1f, 0.62f, 0.56f, 0.96f), StartGameSession);
-        CreateMenuButton(actionPanel.transform, "TUTORIAL", new Vector2(144f, -318f), new Vector2(190f, 52f), new Color(0.22f, 0.28f, 0.33f, 0.96f), ShowTutorial);
-        CreateMenuButton(actionPanel.transform, "QUIT", new Vector2(320f, -318f), new Vector2(120f, 52f), new Color(0.34f, 0.16f, 0.14f, 0.96f), QuitGame);
+        CreateMissionStat(actionPanel.transform, new Vector2(28f, -198f), "03", "NORMAL WAVES");
+        CreateMissionStat(actionPanel.transform, new Vector2(184f, -198f), "03", "FINAL BOSSES");
+        CreateMissionStat(actionPanel.transform, new Vector2(340f, -198f), "VAR", "WEAPON BUILDS");
+
+        CreateMenuButton(actionPanel.transform, "START SELECTED MISSION", new Vector2(260f, -305f), new Vector2(464f, 54f), new Color(0.08f, 0.58f, 0.49f, 1f), StartGameSession);
+        CreateMenuButton(actionPanel.transform, "HOW TO PLAY", new Vector2(158f, -370f), new Vector2(260f, 42f), new Color(0.11f, 0.24f, 0.27f, 1f), ShowTutorial);
+        CreateMenuButton(actionPanel.transform, "QUIT", new Vector2(406f, -370f), new Vector2(132f, 42f), new Color(0.28f, 0.12f, 0.11f, 1f), QuitGame);
+
+        Text footer = CreateMenuText(mainMenuCanvas.transform, "Footer", "WASD MOVE   //   MOUSE AIM + FIRE   //   SPACE DASH   //   ESC PAUSE", 14, TextAnchor.MiddleCenter, new Color(0.46f, 0.67f, 0.65f));
+        footer.rectTransform.anchorMin = new Vector2(0.5f, 0f);
+        footer.rectTransform.anchorMax = new Vector2(0.5f, 0f);
+        footer.rectTransform.anchoredPosition = new Vector2(0f, 18f);
+        footer.rectTransform.sizeDelta = new Vector2(900f, 24f);
 
         CreateTutorialPanel();
     }
@@ -299,7 +310,7 @@ public class GameDirector : MonoBehaviour
 
     private void CreateModeButton(Transform parent, string title, string subtitle, Vector2 position, GameMode mode)
     {
-        Button button = CreateMenuButton(parent, title, position, new Vector2(354f, 52f), new Color(0.1f, 0.18f, 0.2f, 0.96f), () =>
+        Button button = CreateMenuButton(parent, title, position, new Vector2(414f, 58f), new Color(0.07f, 0.14f, 0.16f, 1f), () =>
         {
             selectedMode = mode;
             UpdateModeDescription();
@@ -311,11 +322,18 @@ public class GameDirector : MonoBehaviour
         if (label != null)
         {
             label.text = $"{title}\n{subtitle}";
-            label.fontSize = 18;
+            label.fontSize = 16;
             label.alignment = TextAnchor.MiddleLeft;
-            label.rectTransform.offsetMin = new Vector2(20f, 0f);
-            label.rectTransform.offsetMax = new Vector2(-14f, 0f);
+            label.rectTransform.offsetMin = new Vector2(24f, 0f);
+            label.rectTransform.offsetMax = new Vector2(-44f, 0f);
         }
+
+        Image accent = CreateMenuImage(button.transform, "Selection Accent", new Color(1f, 0.68f, 0.2f, 1f));
+        accent.rectTransform.anchorMin = new Vector2(1f, 0f);
+        accent.rectTransform.anchorMax = new Vector2(1f, 1f);
+        accent.rectTransform.pivot = new Vector2(1f, 0.5f);
+        accent.rectTransform.anchoredPosition = Vector2.zero;
+        accent.rectTransform.sizeDelta = new Vector2(7f, 0f);
     }
 
     private Button CreateMenuButton(Transform parent, string label, Vector2 position, Vector2 size, Color color, UnityEngine.Events.UnityAction action)
@@ -323,12 +341,17 @@ public class GameDirector : MonoBehaviour
         GameObject obj = new GameObject(label);
         obj.transform.SetParent(parent, false);
         Image image = obj.AddComponent<Image>();
-        image.color = color;
+        image.color = Color.white;
+        Outline outline = obj.AddComponent<Outline>();
+        outline.effectColor = new Color(0.25f, 0.64f, 0.59f, 0.75f);
+        outline.effectDistance = new Vector2(1f, -1f);
         Button button = obj.AddComponent<Button>();
         ColorBlock colors = button.colors;
         colors.normalColor = color;
         colors.highlightedColor = new Color(Mathf.Min(color.r + 0.14f, 1f), Mathf.Min(color.g + 0.14f, 1f), Mathf.Min(color.b + 0.14f, 1f), color.a);
         colors.pressedColor = new Color(color.r * 0.72f, color.g * 0.72f, color.b * 0.72f, color.a);
+        colors.selectedColor = colors.highlightedColor;
+        colors.fadeDuration = 0.08f;
         button.colors = colors;
         button.onClick.AddListener(action);
 
@@ -339,8 +362,9 @@ public class GameDirector : MonoBehaviour
         rect.anchoredPosition = position;
         rect.sizeDelta = size;
 
-        Text text = CreateMenuText(obj.transform, "Label", label, 22, TextAnchor.MiddleCenter, Color.white);
+        Text text = CreateMenuText(obj.transform, "Label", label, 20, TextAnchor.MiddleCenter, Color.white);
         Stretch(text.rectTransform);
+        AddTextShadow(text, new Color(0f, 0f, 0f, 0.8f), new Vector2(2f, -2f));
         return button;
     }
 
@@ -538,12 +562,34 @@ public class GameDirector : MonoBehaviour
             Image image = entry.Value.GetComponent<Image>();
             if (image != null)
             {
-                image.color = color;
+                image.color = Color.white;
+            }
+
+            Outline outline = entry.Value.GetComponent<Outline>();
+            if (outline != null)
+            {
+                outline.effectColor = selected
+                    ? new Color(1f, 0.68f, 0.22f, 0.95f)
+                    : new Color(0.18f, 0.46f, 0.44f, 0.62f);
+                outline.effectDistance = selected ? new Vector2(2f, -2f) : new Vector2(1f, -1f);
+            }
+
+            Transform accent = entry.Value.transform.Find("Selection Accent");
+            if (accent != null)
+            {
+                accent.gameObject.SetActive(selected);
+            }
+
+            Text label = entry.Value.GetComponentInChildren<Text>();
+            if (label != null)
+            {
+                label.color = selected ? Color.white : new Color(0.72f, 0.82f, 0.8f, 1f);
             }
 
             ColorBlock colors = entry.Value.colors;
             colors.normalColor = color;
             colors.highlightedColor = new Color(Mathf.Min(color.r + 0.12f, 1f), Mathf.Min(color.g + 0.12f, 1f), Mathf.Min(color.b + 0.12f, 1f), color.a);
+            colors.selectedColor = colors.highlightedColor;
             entry.Value.colors = colors;
         }
     }
@@ -583,6 +629,99 @@ public class GameDirector : MonoBehaviour
         text.horizontalOverflow = HorizontalWrapMode.Wrap;
         text.verticalOverflow = VerticalWrapMode.Overflow;
         return text;
+    }
+
+    private static Image CreateMenuFrame(Transform parent, string name, Vector2 position, Vector2 size, Color fill, Color border)
+    {
+        Image image = CreateMenuImage(parent, name, fill);
+        RectTransform rect = image.rectTransform;
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+
+        Outline outline = image.gameObject.AddComponent<Outline>();
+        outline.effectColor = border;
+        outline.effectDistance = new Vector2(2f, -2f);
+        return image;
+    }
+
+    private static Image CreateMenuTopLeftFrame(Transform parent, string name, Vector2 position, Vector2 size, Color fill, Color border)
+    {
+        Image image = CreateMenuImage(parent, name, fill);
+        RectTransform rect = image.rectTransform;
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 1f);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+
+        Outline outline = image.gameObject.AddComponent<Outline>();
+        outline.effectColor = border;
+        outline.effectDistance = new Vector2(1f, -1f);
+        return image;
+    }
+
+    private static void CreatePanelHeader(Transform parent, string label, Color accentColor)
+    {
+        Image accent = CreateMenuImage(parent, "Panel Header Accent", accentColor);
+        accent.rectTransform.anchorMin = new Vector2(0f, 1f);
+        accent.rectTransform.anchorMax = new Vector2(1f, 1f);
+        accent.rectTransform.pivot = new Vector2(0.5f, 1f);
+        accent.rectTransform.anchoredPosition = Vector2.zero;
+        accent.rectTransform.sizeDelta = new Vector2(-2f, 5f);
+
+        Text title = CreateMenuText(parent, "Panel Header", label, 20, TextAnchor.MiddleLeft, accentColor);
+        PlaceMenuTopLeft(title.rectTransform, new Vector2(24f, -20f), new Vector2(420f, 34f));
+    }
+
+    private static void CreateMissionStat(Transform parent, Vector2 position, string value, string label)
+    {
+        Image stat = CreateMenuTopLeftFrame(parent, $"{label} Stat", position, new Vector2(136f, 62f), new Color(0.012f, 0.028f, 0.031f, 1f), new Color(0.14f, 0.36f, 0.35f, 0.8f));
+        Text valueText = CreateMenuText(stat.transform, "Value", value, 24, TextAnchor.MiddleCenter, new Color(1f, 0.76f, 0.34f));
+        valueText.rectTransform.anchorMin = new Vector2(0f, 0.38f);
+        valueText.rectTransform.anchorMax = new Vector2(1f, 1f);
+        valueText.rectTransform.offsetMin = Vector2.zero;
+        valueText.rectTransform.offsetMax = Vector2.zero;
+        Text labelText = CreateMenuText(stat.transform, "Label", label, 11, TextAnchor.MiddleCenter, new Color(0.55f, 0.76f, 0.73f));
+        labelText.rectTransform.anchorMin = Vector2.zero;
+        labelText.rectTransform.anchorMax = new Vector2(1f, 0.38f);
+        labelText.rectTransform.offsetMin = Vector2.zero;
+        labelText.rectTransform.offsetMax = Vector2.zero;
+    }
+
+    private static void PlaceMenuTopLeft(RectTransform rect, Vector2 position, Vector2 size)
+    {
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 1f);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+    }
+
+    private static void PlaceMenuTopRight(RectTransform rect, Vector2 position, Vector2 size)
+    {
+        rect.anchorMin = new Vector2(1f, 1f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(1f, 1f);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+    }
+
+    private static void StretchWithPadding(RectTransform rect, float horizontal, float vertical)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = new Vector2(horizontal, vertical);
+        rect.offsetMax = new Vector2(-horizontal, -vertical);
+    }
+
+    private static void AddTextShadow(Text text, Color color, Vector2 distance)
+    {
+        Shadow shadow = text.gameObject.AddComponent<Shadow>();
+        shadow.effectColor = color;
+        shadow.effectDistance = distance;
     }
 
     private static void CreateMenuDecoration(Transform parent, Vector2 position, Vector2 size, Color color, float rotation)
