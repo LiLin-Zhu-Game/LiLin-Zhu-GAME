@@ -12,7 +12,7 @@ public class PlayerController : MonoBehaviour
 
     [Header("Survival")]
     [SerializeField] private int maxHealth = 100;
-    [SerializeField] private int maxArmor = 100;
+    [SerializeField] private int maxArmor = 20;
     [SerializeField] private float scrapPickupRadius = 1.45f;
 
     [Header("Heat")]
@@ -23,7 +23,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float purgeRadius = 3.1f;
     [SerializeField] private int purgeDamage = 36;
     [SerializeField] private float purgeKnockback = 9f;
-    [SerializeField] private int novaScrapCost = 10;
+    [SerializeField] private int novaScrapCost = 20;
     [SerializeField] private float novaRadius = 4.2f;
     [SerializeField] private int novaDamage = 58;
     [SerializeField] private float novaKnockback = 13f;

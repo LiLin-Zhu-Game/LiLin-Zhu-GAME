@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class GearScavengerBootstrapper
@@ -203,6 +202,11 @@ public class GameDirector : MonoBehaviour
 
     private void CreateMainMenu()
     {
+        DestroyRuntimeObject(ref mainMenuCanvas);
+        tutorialPanel = null;
+        modeDescriptionText = null;
+        modeButtons.Clear();
+
         EnsureEventSystem();
 
         mainMenuCanvas = new GameObject("Gear Scavenger Main Menu");
@@ -518,7 +522,62 @@ public class GameDirector : MonoBehaviour
     private void ReturnToMainMenu()
     {
         Time.timeScale = 1f;
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        StopAllCoroutines();
+        CleanupActiveRun();
+        selectedMode = GameMode.Story;
+        CreateMainMenu();
+    }
+
+    private void CleanupActiveRun()
+    {
+        DestroyRuntimeObject(ref pauseCanvas);
+        DestroyRuntimeObject(ref resultCanvas);
+        DestroyRuntimeObject(ref mainMenuCanvas);
+        tutorialPanel = null;
+        hud = null;
+        player = null;
+
+        foreach (PlayerController existingPlayer in FindObjectsOfType<PlayerController>())
+        {
+            DestroyRuntimeObject(existingPlayer.gameObject);
+        }
+
+        foreach (EnemyController enemy in FindObjectsOfType<EnemyController>())
+        {
+            DestroyRuntimeObject(enemy.gameObject);
+        }
+
+        RemoveSceneObject("Generated Mechanical Rooms");
+        RemoveSceneObject("HUD");
+        RemoveSceneObject("Player Bullets");
+        RemoveSceneObject("Enemy Bullets");
+        RemoveSceneObject("Enemies");
+        RemoveSceneObject("Scraps");
+        RemoveSceneObject("Weapon Pickups");
+        RemoveSceneObject("Purge Bursts");
+
+        playerBullets = null;
+        enemyBullets = null;
+        enemies = null;
+        scraps = null;
+        weaponPickups = null;
+        hitBursts = null;
+
+        activeEnemies.Clear();
+        floorCells.Clear();
+        walkable.Clear();
+        blockedCells.Clear();
+        rooms.Clear();
+        modeButtons.Clear();
+
+        wave = 0;
+        salvageCores = 0;
+        defeatedMachines = 0;
+        roomsCleared = 0;
+        statusTimer = 0f;
+        isPaused = false;
+        gameOver = false;
+        gameStarted = false;
     }
 
     private void QuitGame()
@@ -1372,11 +1431,11 @@ public class GameDirector : MonoBehaviour
 
     private Sprite LoadSprite(string assetName, Sprite fallback)
     {
-        Sprite candidate = LoadCandidateSprite(assetName);
-        if (candidate != null)
+        Sprite packagedRuntime = LoadPackagedRuntimeSprite(assetName);
+        if (packagedRuntime != null)
         {
             UsingCandidateArt = true;
-            return candidate;
+            return packagedRuntime;
         }
 
         Sprite loaded = Resources.Load<Sprite>($"GearScavenger/{assetName}");
@@ -1388,6 +1447,13 @@ public class GameDirector : MonoBehaviour
         Texture2D texture = Resources.Load<Texture2D>($"GearScavenger/{assetName}");
         if (texture == null)
         {
+            Sprite candidate = LoadCandidateSprite(assetName);
+            if (candidate != null)
+            {
+                UsingCandidateArt = true;
+                return candidate;
+            }
+
             return fallback;
         }
 
@@ -1397,12 +1463,23 @@ public class GameDirector : MonoBehaviour
     private Sprite LoadCandidateSprite(string assetName)
     {
         string candidatePath = Path.Combine(Application.dataPath, "ArtCandidates", "PreparedRuntime", $"{assetName}.png");
-        if (!File.Exists(candidatePath))
+        return LoadPngSprite(candidatePath, $"Candidate {assetName}");
+    }
+
+    private Sprite LoadPackagedRuntimeSprite(string assetName)
+    {
+        string packagedPath = Path.Combine(Application.streamingAssetsPath, "GearScavengerRuntime", $"{assetName}.png");
+        return LoadPngSprite(packagedPath, $"Runtime {assetName}");
+    }
+
+    private Sprite LoadPngSprite(string path, string spriteName)
+    {
+        if (!File.Exists(path))
         {
             return null;
         }
 
-        byte[] bytes = File.ReadAllBytes(candidatePath);
+        byte[] bytes = File.ReadAllBytes(path);
         Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
         if (!texture.LoadImage(bytes))
         {
@@ -1410,7 +1487,7 @@ public class GameDirector : MonoBehaviour
             return null;
         }
 
-        texture.name = $"Candidate {assetName}";
+        texture.name = spriteName;
         texture.filterMode = FilterMode.Point;
         texture.wrapMode = TextureWrapMode.Clamp;
         return Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), Mathf.Max(texture.width, texture.height));
@@ -1930,6 +2007,28 @@ public class GameDirector : MonoBehaviour
     private void RemoveEditorPreviewMap()
     {
         RemoveSceneObject("Gear Scavenger Editor Preview");
+    }
+
+    private void DestroyRuntimeObject(ref GameObject target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        DestroyRuntimeObject(target);
+        target = null;
+    }
+
+    private void DestroyRuntimeObject(GameObject target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        target.SetActive(false);
+        Destroy(target);
     }
 
     private void RemoveSceneObject(string objectName)

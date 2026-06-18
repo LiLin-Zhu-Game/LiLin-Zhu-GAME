@@ -9,14 +9,24 @@ public static class GearScavengerDemoBuilder
 {
     private static readonly string[] RequiredReleaseAssets =
     {
-        "Assets/Scenes/SampleScene.unity",
+        "Assets/Scenes/Gear_Scavenger.unity",
         "Assets/Scripts/GearScavengerGame.cs",
         "Assets/Scripts/PlayerController.cs",
         "Assets/Resources/GearScavenger/player.png",
         "Assets/Resources/GearScavenger/enemy_chaser.png",
         "Assets/Resources/GearScavenger/enemy_drone.png",
         "Assets/Resources/GearScavenger/enemy_support.png",
-        "Assets/Resources/GearScavenger/enemy_boss.png"
+        "Assets/Resources/GearScavenger/enemy_boss.png",
+        "Assets/StreamingAssets/GearScavengerRuntime/floor_a.png",
+        "Assets/StreamingAssets/GearScavengerRuntime/floor_b.png",
+        "Assets/StreamingAssets/GearScavengerRuntime/wall.png",
+        "Assets/StreamingAssets/GearScavengerRuntime/player.png",
+        "Assets/StreamingAssets/GearScavengerRuntime/crate.png",
+        "Assets/StreamingAssets/GearScavengerRuntime/barrel.png",
+        "Assets/StreamingAssets/GearScavengerRuntime/terminal.png",
+        "Assets/StreamingAssets/GearScavengerRuntime/weapon_coil.png",
+        "Assets/StreamingAssets/GearScavengerRuntime/weapon_lance.png",
+        "Assets/StreamingAssets/GearScavengerRuntime/weapon_swarm.png"
     };
 
     [MenuItem("Gear Scavenger/Run Release Readiness Check")]

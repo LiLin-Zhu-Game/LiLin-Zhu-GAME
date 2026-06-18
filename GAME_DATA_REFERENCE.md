@@ -1,223 +1,204 @@
-# Gear Scavenger 游戏数据总表
+# Gear Scavenger Full Game Data Table
+This document records the functional operational values active in the current code. Theoretical DPS assumes all projectiles land and does not account for overheating, dashing, range, spread, or enemy armor.
 
-本文档记录当前代码中实际生效的运行数值。理论 DPS 假设所有弹丸命中，
-且未计算过热、换位、射程、散射和目标护甲。
-
-## 1. 玩家基础数据
-
-| 数据 | 数值 |
+## 1. Base Player Stats
+| Stat | Value |
 | --- | ---: |
-| 初始/最大核心生命 | 100 |
-| 初始/最大护甲 | 100 |
-| 基础移动速度 | 6.2 |
-| 冲刺速度 | 12 |
-| 冲刺持续时间 | 0.12 秒 |
-| 冲刺冷却 | 0.9 秒 |
-| 初始废料拾取半径 | 1.45 |
-| 废料吸附开始距离 | 拾取半径的 2.2 倍，初始为 3.19 |
-| 每个废料的资源价值 | 1 废料 |
-| 每个废料附带护甲恢复 | 4 |
-| 最大热量 | 100 |
-| 自然冷却速度 | 每秒 18 热量 |
-| 过热解除阈值 | 热量降至 32 |
+| Starting/Max Core Health | 100 |
+| Starting/Max Armor | 100 |
+| Base Movement Speed | 6.2 |
+| Dash Speed | 12 |
+| Dash Duration | 0.12 seconds |
+| Dash Cooldown | 0.9 seconds |
+| Starting Scrap Pickup Radius | 1.45 |
+| Scrap Magnetisation Start Distance | 2.2 times pickup radius, starting at 3.19 |
+| Resource Value per Scrap Piece | 1 Scrap Unit |
+| Armor Restored per Scrap Piece | 4 |
+| Max Heat Threshold | 100 |
+| Passive Heat Dissipation Rate | 18 Heat per second |
+| Overheat Recovery Threshold | Heat reduced to 32 |
 
-敌人伤害会先消耗护甲，护甲耗尽后才会降低核心生命。核心生命降至 0 时失败。
+Enemy damage depletes armor first; core health only takes damage once armor is fully exhausted. The run ends in failure when core health hits 0.
 
-## 2. 玩家主动能力
-
-| 能力 | 按键 | 消耗/条件 | 效果 |
+## 2. Player Active Abilities
+| Ability | Hotkey | Cost / Requirement | Effect |
 | --- | --- | --- | --- |
-| 冲刺 | Space | 0.9 秒冷却 | 以 12 速度移动 0.12 秒 |
-| 热量净化 Purge | R | 热量至少 24.75 | 减少 45 热量；半径 3.1；造成 36 伤害与 9 击退 |
-| 废料新星 Scrap Nova | Q | 10 废料 | 半径 4.2；中心伤害 58，边缘约 26；13 击退；增加 22 热量 |
-| 磁力护盾 Magnetic Guard | F | 6 废料 | 持续 4.5 秒；修复 16 护甲；降低 26 热量；受到伤害降低 55% |
+| Dash | Space | 0.9 second cooldown | Move at 12 speed for 0.12 seconds |
+| Purge | R | Minimum 24.75 Heat | Reduce heat by 45; 3.1 radius, deal 36 damage and apply 9 knockback |
+| Scrap Nova | Q | 10 Scrap Units | 4.2 radius; 58 central damage, ~26 edge damage; 13 knockback; generate 22 Heat |
+| Magnetic Guard | F | 6 Scrap Units | Lasts 4.5 seconds; restore 16 armor; reduce heat by 26; incoming damage cut by 55% |
 
-## 3. 武器数据
+## 3. Weapon Statistics
+Parameter order matches code order: Fire Interval, Heat Per Shot, Damage Per Projectile, Projectile Speed, Spread Angle, Projectile Count, Projectile Lifespan. Theoretical range is calculated as `Projectile Speed × Projectile Lifespan`.
 
-参数顺序与代码一致：开火间隔、单次热量、单弹伤害、弹速、散射角、
-弹丸数量、弹丸寿命。射程为 `弹速 × 弹丸寿命` 的理论值。
-
-| 武器 | 单弹伤害 | 弹丸数 | 单次总伤害 | 开火间隔 | 理论 DPS | 单次热量 | 每秒热量 | 弹速 | 散射 | 寿命 | 理论射程 |
+| Weapon | Damage Per Projectile | Projectile Count | Total Damage Per Shot | Fire Interval | Theoretical DPS | Heat Per Shot | Heat Per Second | Projectile Speed | Spread Angle | Lifespan | Theoretical Range |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Rust Rifle 锈蚀步枪 | 18 | 1 | 18 | 0.14 | 128.6 | 9.5 | 67.9 | 13 | 3.5° | 1.6 | 20.8 |
-| Scatter Core 散射核心 | 12 | 5 | 60 | 0.28 | 214.3 | 17 | 60.7 | 11 | 12° | 1.15 | 12.65 |
-| Beam Needle 光束针 | 9 | 1 | 9 | 0.08 | 112.5 | 6.5 | 81.3 | 17 | 1.2° | 1.25 | 21.25 |
-| Scrap Cannon 废料炮 | 42 | 1 | 42 | 0.48 | 87.5 | 24 | 50 | 9.5 | 4° | 1.9 | 18.05 |
-| Coil Ripper 线圈撕裂者 | 7 | 1 | 7 | 0.055 | 127.3 | 4.8 | 87.3 | 18 | 5.5° | 1.05 | 18.9 |
-| Arc Splitter 电弧分裂器 | 14 | 3 | 42 | 0.24 | 175 | 15 | 62.5 | 12 | 18° | 1.35 | 16.2 |
-| Heat Lance 热能长枪 | 70 | 1 | 70 | 0.68 | 102.9 | 34 | 50 | 20 | 0.6° | 1.1 | 22 |
-| Nanite Swarm 纳米虫群 | 8 | 6 | 48 | 0.18 | 266.7 | 11 | 61.1 | 10 | 28° | 1.65 | 16.5 |
-| Rail Spike 轨道钉刺 | 52 | 1 | 52 | 0.38 | 136.8 | 20 | 52.6 | 24 | 0.35° | 1.35 | 32.4 |
-| Pulse Sprayer 脉冲喷射器 | 11 | 2 | 22 | 0.1 | 220 | 7.2 | 72 | 14 | 15° | 1.4 | 19.6 |
+| Rust Rifle | 18 | 1 | 18 | 0.14 | 128.6 | 9.5 | 67.9 | 13 | 3.5° | 1.6 | 20.8 |
+| Scatter Core | 12 | 5 | 60 | 0.28 | 214.3 | 17 | 60.7 | 11 | 12° | 1.15 | 12.65 |
+| Beam Needle | 9 | 1 | 9 | 0.08 | 112.5 | 6.5 | 81.3 | 17 | 1.2° | 1.25 | 21.25 |
+| Scrap Cannon | 42 | 1 | 42 | 0.48 | 87.5 | 24 | 50 | 9.5 | 4° | 1.9 | 18.05 |
+| Coil Ripper | 7 | 1 | 7 | 0.055 | 127.3 | 4.8 | 87.3 | 18 | 5.5° | 1.05 | 18.9 |
+| Arc Splitter | 14 | 3 | 42 | 0.24 | 175 | 15 | 62.5 | 12 | 18° | 1.35 | 16.2 |
+| Heat Lance | 70 | 1 | 70 | 0.68 | 102.9 | 34 | 50 | 20 | 0.6° | 1.1 | 22 |
+| Nanite Swarm | 8 | 6 | 48 | 0.18 | 266.7 | 11 | 61.1 | 10 | 28° | 1.65 | 16.5 |
+| Rail Spike | 52 | 1 | 52 | 0.38 | 136.8 | 20 | 52.6 | 24 | 0.35° | 1.35 | 32.4 |
+| Pulse Sprayer | 11 | 2 | 22 | 0.1 | 220 | 7.2 | 72 | 14 | 15° | 1.4 | 19.6 |
 
-玩家初始装备为 Rust Rifle。出生点固定提供 Scatter Core、Beam Needle 和
-Scrap Cannon 三把可拾取武器。
+Players start equipped with the Rust Rifle. Three pickupable weapons spawn permanently at the starting zone: Scatter Core, Beam Needle, and Scrap Cannon.
 
-## 4. 技能核心
-
-| 技能核心 | 类型 | 实际效果 |
+## 4. Skill Cores
+| Skill Core | Type | Functional Effect |
 | --- | --- | --- |
-| Kinetic Overdrive 动力超频 | 临时 | 持续 24 秒；移动速度提高 25% 至 7.75；开火间隔降低 28% |
-| Coolant Matrix 冷却矩阵 | 永久 | 武器产热乘以 0.78，并立刻清空热量 |
-| Nanite Shell 纳米装甲 | 永久 | 最大护甲增加 25，恢复 45 护甲，并恢复 20 核心生命 |
-| Salvage Magnet 废料磁体 | 永久 | 拾取半径增加 0.9，由 1.45 提升至 2.35；获得 8 废料，并因此最多恢复 32 护甲 |
+| Kinetic Overdrive | Temporary | Lasts 24 seconds; 25% movement speed boost to 7.75; 28% reduced fire interval |
+| Coolant Matrix | Permanent | Weapon heat generation multiplied by 0.78; instantly clear all accumulated heat |
+| Nanite Shell | Permanent | Max armor increased by 25; restore 45 armor and 20 core health |
+| Salvage Magnet | Permanent | Pickup radius increased by 0.9 from 1.45 to 2.35; grant 8 Scrap Units, restoring a maximum of 32 armor |
 
-## 5. 敌人数据
-
-| 敌人 | HP | 速度 | 接触伤害 | 接触间隔 | 主要攻击与机制 | 实际总废料掉落 |
+## 5. Enemy Statistics
+| Enemy | HP | Movement Speed | Contact Damage | Contact Hit Interval | Primary Attacks & Mechanics | Total Scrap Drop On Death |
 | --- | ---: | ---: | ---: | ---: | --- | ---: |
-| Ripper Chaser 追猎者 | 64 | 3.35 | 13 | 0.55 秒 | 快速近战追击 | 4 |
-| Hornet Drone 射击无人机 | 46 | 2.25 | 8 | 0.8 秒 | 每 1.35 秒发射 1 枚精准弹；伤害 9；弹速 8.8；寿命 2.1 秒 | 4 |
-| Scarab Support 维修支援者 | 82 | 1.75 | 8 | 0.8 秒 | 每 3.2 秒为 4.5 范围内受伤友军恢复 14 HP；使 4 范围内其他敌人速度提高 35% | 7 |
-| Centipede Bulwark 重装壁垒 | 180 | 1.35 | 22 | 1.15 秒 | 每 3.8 秒可冲撞 0.65 秒；冲撞速度约为基础速度的 3.8 倍 | 13 |
-| Wasp Artillery 炮击蜂 | 58 | 1.55 | 8 | 0.8 秒 | 每 2.45 秒发射 5 枚扇形弹；每弹 6 伤害；弹速 5.4；寿命 2.7 秒 | 6 |
-| Breaker Boss 破坏者 Boss | 620 | 1.75 | 24 | 0.8 秒 | 交替使用瞄准三连射与环形弹幕；半血后进入第二阶段 | 22 |
-| Siege Titan 攻城泰坦 Boss | 780 | 1.30 | 30 | 0.8 秒 | 重型扇形/环形弹幕；周期高速冲锋；半血后冲锋与射击更频繁 | 22 |
-| Reactor Warden 反应堆守卫 Boss | 540 | 2.10 | 18 | 0.8 秒 | 持续旋转螺旋弹幕；周期瞄准齐射；半血后弹幕臂数与频率提高 | 22 |
+| Ripper Chaser | 64 | 3.35 | 13 | 0.55 seconds | Fast melee pursuer | 4 |
+| Hornet Drone | 46 | 2.25 | 8 | 0.8 seconds | Fires 1 precision projectile every 1.35 seconds; 9 damage, 8.8 projectile speed, 2.1 second lifespan | 4 |
+| Scarab Support | 82 | 1.75 | 8 | 0.8 seconds | Heal injured allies within 4.5 radius for 14 HP every 3.2 seconds; buff speed of other enemies in 4 radius by 35% | 7 |
+| Centipede Bulwark | 180 | 1.35 | 22 | 1.15 seconds | Charge forward for 0.65 seconds every 3.8 seconds; charge speed roughly 3.8x base movement speed | 13 |
+| Wasp Artillery | 58 | 1.55 | 8 | 0.8 seconds | Fires a spread of 5 projectiles every 2.45 seconds; 6 damage per projectile, 5.4 speed, 2.7 second lifespan | 6 |
+| Breaker Boss | 620 | 1.75 | 24 | 0.8 seconds | Alternates targeted triple shot and circular barrage; enters Phase 2 when HP drops below half | 22 |
+| Siege Titan Boss | 780 | 1.30 | 30 | 0.8 seconds | Heavy spread/circular barrages; periodic high-speed charges; charges and fire rate become more frequent below half HP | 22 |
+| Reactor Warden Boss | 540 | 2.10 | 18 | 0.8 seconds | Constant rotating spiral barrage; periodic targeted volleys; additional spiral arms and faster fire rate below half HP | 22 |
 
-### 敌人防御、距离与特殊规则
-
-| 规则 | 数值 |
+### Enemy Defense, Distance & Special Rules
+| Rule | Value |
 | --- | --- |
-| 重装壁垒承受伤害 | 原伤害的 48%，即约 52% 减伤 |
-| 重装壁垒承受击退 | 正常击退的 20% |
-| Breaker/反应堆守卫承受击退 | 正常击退的 35% |
-| 攻城泰坦承受击退 | 正常击退的 12% |
-| Boss 第二阶段触发 | 各自 HP ≤ 50% |
-| 房间警戒规则 | 玩家进入战斗房间后，该房间全部敌人立即永久警戒，不再要求靠近单个敌人 |
-| 无人机后撤距离 | 玩家距离小于 4.2 |
-| 支援者停止移动距离 | 玩家距离 3.5 至 5 |
-| 炮击蜂停止移动距离 | 玩家距离 5.8 至 7.8 |
+| Damage Received – Centipede Bulwark | 48% of incoming raw damage (~52% damage resistance) |
+| Knockback Received – Centipede Bulwark | 20% standard knockback force |
+| Knockback Received – Breaker / Reactor Warden | 35% standard knockback force |
+| Knockback Received – Siege Titan | 12% standard knockback force |
+| Boss Phase 2 Activation Threshold | HP ≤ 50% of maximum health |
+| Room Alert State Rule | Upon player entry into a combat room, all enemies in the room permanently activate alert status; no proximity trigger required for individual enemies |
+| Hornet Drone Retreat Distance | Drone pulls back when player distance < 4.2 |
+| Scarab Support Halt Movement Range | Stops moving if player distance is between 3.5 and 5 |
+| Wasp Artillery Halt Movement Range | Stops moving if player distance is between 5.8 and 7.8 |
 
-### 三 Boss 攻击数据
-
-| 阶段 | 攻击 | 数据 |
+### Three Boss Attack Breakdown
+| Phase | Attack Pattern | Stats |
 | --- | --- | --- |
-| 第一阶段 | 瞄准三连射 | 中心弹 13 伤害、速度 9；两侧弹各 9 伤害、速度 8 |
-| 第一阶段 | 环形弹幕 | 8 枚弹；每弹 7 伤害；速度 6.2 |
-| 第一阶段 | 攻击间隔 | 1.05 秒 |
-| 第二阶段 | 瞄准三连射 | 中心弹速度提高至 10.5；伤害不变 |
-| 第二阶段 | 旋转环形弹幕 | 12 枚弹；每弹 7 伤害；速度 7.2 |
-| 第二阶段 | 攻击间隔 | 0.72 秒 |
+| Phase 1 | Targeted Triple Shot | Central projectile: 13 damage, 9 speed; side projectiles: 9 damage each, 8 speed |
+| Phase 1 | Circular Barrage | 8 projectiles; 7 damage each, 6.2 speed |
+| Phase 1 | Attack Cycle Interval | 1.05 seconds |
+| Phase 2 | Targeted Triple Shot | Central projectile speed raised to 10.5; damage unchanged |
+| Phase 2 | Rotating Circular Barrage | 12 projectiles; 7 damage each, 7.2 speed |
+| Phase 2 | Attack Cycle Interval | 0.72 seconds |
 
-- **Siege Titan：** 交替发射 5 枚重型扇形弹和 12 枚环形弹；半血后分别提高为更快的重弹与 16 枚环形弹；周期进行高速冲锋。
-- **Reactor Warden：** 持续发射旋转螺旋弹幕并周期加入瞄准三连弹；半血后螺旋弹幕由 2 臂提高为 4 臂，攻击间隔由 0.38 秒缩短至 0.26 秒。
+- **Siege Titan**: Alternates volleys of 5 heavy spread shots and 12 circular shots; below half HP, heavy shots fire faster and circular barrage expands to 16 projectiles; executes periodic high-speed charges.
+- **Reactor Warden**: Continuously fires rotating spiral barrages mixed with periodic targeted triple shots; below half HP, spiral barrage arms increase from 2 to 4, attack interval shortened from 0.38 seconds to 0.26 seconds.
 
-## 6. 敌人掉落与武器奖励
+## 6. Enemy Loot & Weapon Rewards
+Total scrap dropped on enemy death equals base scrap drop plus type bonus scrap; values listed in the enemy stats table reflect this combined total.
 
-敌人死亡废料由“基础掉落”和“类型奖励”相加，因此上表列出的是实际总量。
-
-| 敌人 | 基础废料 | 类型奖励 | 实际总量 |
+| Enemy | Base Scrap Drop | Type Bonus Scrap | Total Scrap Yield |
 | --- | ---: | ---: | ---: |
-| 追猎者 | 2 | 2 | 4 |
-| 无人机 | 2 | 2 | 4 |
-| 支援者 | 3 | 4 | 7 |
-| 重装壁垒 | 7 | 6 | 13 |
-| 炮击蜂 | 2 | 4 | 6 |
-| Boss | 12 | 10 | 22 |
+| Ripper Chaser | 2 | 2 | 4 |
+| Hornet Drone | 2 | 2 | 4 |
+| Scarab Support | 3 | 4 | 7 |
+| Centipede Bulwark | 7 | 6 | 13 |
+| Wasp Artillery | 2 | 4 | 6 |
+| Boss Enemies | 12 | 10 | 22 |
 
-- 普通敌人死亡有 18% 概率随机掉落一把武器。
-- Boss 必定随机掉落一把武器。
-- 每击败 6 台机器，额外生成一把按清理进度提升的固定武器奖励。
-- 拾取每个废料都会同时增加 1 废料资源并恢复 4 护甲。
+- Standard enemies have an 18% chance to drop a random weapon upon death.
+- Bosses guarantee a random weapon drop on defeat.
+- Every sixth machine eliminated spawns an additional fixed weapon reward scaled to wave progression.
+- Collecting each scrap piece simultaneously adds 1 scrap resource and restores 4 armor.
 
-## 7. 可破坏物与房间设施
-
-| 设施 | HP | 废料掉落 | 武器掉落概率 | 特殊效果 |
+## 7. Destructible Objects & Room Interactables
+| Object | HP | Scrap Drop | Weapon Drop Chance | Unique Effect |
 | --- | ---: | ---: | ---: | --- |
-| Breakable Crate 可破坏箱子 | 36 | 3 | 8% | 阻挡移动和子弹 |
-| Scrap Barrel 废料桶 | 34 | 2 | 4% | 阻挡移动和子弹 |
-| Volatile Fuel Barrel 爆炸油桶 | 28 | 6 | 14% | 爆炸半径 2.4；对敌 30 伤害与 5.5 击退；玩家在 2.04 范围内受到 8 伤害 |
-| Terminal 终端 | 58 | 5 | 16% | 阻挡移动和子弹 |
-| Reinforced Barricade 强化路障 | 92 | 4 | 6% | 高耐久掩体，阻挡移动和子弹 |
-| Scrap Machinery 废料机械 | 不可破坏 | 0 | 0% | 永久阻挡物 |
+| Breakable Crate | 36 | 3 | 8% | Blocks player movement and projectiles |
+| Scrap Barrel | 34 | 2 | 4% | Blocks player movement and projectiles |
+| Volatile Fuel Barrel | 28 | 6 | 14% | Explosion radius 2.4; deals 30 damage and 5.5 knockback to enemies; player within 2.04 radius takes 8 damage |
+| Terminal | 58 | 5 | 16% | Blocks player movement and projectiles |
+| Reinforced Barricade | 92 | 4 | 6% | High-durability cover, blocks movement and projectiles |
+| Scrap Machinery | Indestructible | 0 | 0% | Permanent impassable terrain |
 
-| 互动设施 | 实际效果 |
+| Interactive Station | Functional Effect |
 | --- | --- |
-| Repair Station 维修站 | 玩家停留时每 1.25 秒恢复 10 护甲 |
-| Cooling Station 冷却站 | 玩家停留时每 1.25 秒降低 24 热量 |
-| Coolant Recovery Zone 冷却池 | 玩家每秒约降低 32 热量；敌人速度降至 52% |
-| Unstable Shock Field 脉冲电场 | 初次脉冲延迟随机 0.5 至 1.2 秒；之后每 1.65 秒脉冲；对已苏醒敌人造成 16 伤害，对玩家造成 7 伤害 |
-| Recovered Defense Turret 友方防御炮塔 | 玩家需在 5.6 范围内；寻找 6.2 范围内已苏醒敌人；每 0.72 秒发射 13 伤害子弹；弹速 13；寿命 1.3 秒 |
+| Repair Station | Restores 10 armor every 1.25 seconds while player remains within bounds |
+| Cooling Station | Reduces heat by 24 every 1.25 seconds while player remains within bounds |
+| Coolant Recovery Zone | Dissipates ~32 heat per second for players; enemy movement speed reduced to 52% baseline |
+| Unstable Shock Field | Initial pulse delay randomized between 0.5–1.2 seconds; subsequent pulses every 1.65 seconds; deals 16 damage to alerted enemies, 7 damage to player |
+| Recovered Defense Turret | Requires player within 5.6 radius; targets alerted enemies within 6.2 radius; fires 13-damage bullets every 0.72 seconds, 13 projectile speed, 1.3 second lifespan |
 
-### 障碍物与工具显示尺寸
-
-| 对象 | 当前视觉缩放 |
+### Object Visual Scaling Sizes
+| Object | Current Visual Scale Multiplier |
 | --- | ---: |
-| 可破坏箱子 | 1.05 |
-| 普通/爆炸油桶 | 1.08 |
-| 终端 | 1.28 |
-| 废料机械 | 原始布置倍率 × 1.05 |
-| 强化路障 | 1.9 × 0.9 |
-| 维修站/冷却站 | 1.9 |
-| 防御炮塔 | 1.6 |
-| 技能核心 | 1.15，并带有约 ±12% 呼吸动画 |
-| 冷却池 | 直径约 3.1 |
-| 电场 | 直径为配置半径的 2 倍，并带有脉冲动画 |
+| Breakable Crate | 1.05 |
+| Standard / Volatile Fuel Barrel | 1.08 |
+| Terminal | 1.28 |
+| Scrap Machinery | Original layout scale × 1.05 |
+| Reinforced Barricade | 1.9 × 0.9 |
+| Repair / Cooling Station | 1.9 |
+| Defense Turret | 1.6 |
+| Skill Core | 1.15 scale with ±12% breathing animation |
+| Coolant Recovery Zone | ~3.1 unit diameter |
+| Shock Field | Diameter equals twice configured radius with pulsing animation |
 
-## 8. 房间与地图结构
-
-| 房间 | 中心坐标 | 尺寸 | 难度 | 类型与设施 |
+## 8. Rooms & Map Layout Structure
+| Room Name | Central Coordinates | Dimensions | Difficulty Tier | Layout & Facilities |
 | --- | --- | --- | ---: | --- |
-| Start Workshop 初始工坊 | (0, 0) | 10 × 8 | 0 | 非战斗房；维修站；出生武器 |
-| Scrap Yard 废料场 | (-13, 0) | 9 × 8 | 1 | 电场、强化路障、动力超频核心 |
-| Assembly Maze 装配迷宫 | (13, 0) | 9 × 8 | 2 | 电场、两处强化路障、冷却矩阵核心 |
-| Cache Room 缓存室 | (0, 10) | 8 × 7 | 2 | 冷却池、友方炮塔、冷却站、纳米装甲核心 |
-| Reactor Yard 反应堆场 | (0, -10) | 10 × 7 | 3 | 两个电场、两处强化路障、废料磁体核心 |
-| Isolated Boss Arena 独立 Boss 竞技场 | (0, 0) | 18 × 12 | Boss | 仅在 Wave 4 生成；三个不同 Boss、支援者、炮击蜂、路障、电场和维修站 |
+| Start Workshop | (0, 0) | 10 × 8 | 0 | Non-combat zone; Repair Station; starter weapons spawn |
+| Scrap Yard | (-13, 0) | 9 × 8 | 1 | Shock Field, Reinforced Barricades, Kinetic Overdrive Core |
+| Assembly Maze | (13, 0) | 9 × 8 | 2 | Shock Field, two Reinforced Barricades, Coolant Matrix Core |
+| Cache Room | (0, 10) | 8 × 7 | 2 | Coolant Recovery Zone, Allied Defense Turret, Cooling Station, Nanite Shell Core |
+| Reactor Yard | (0, -10) | 10 × 7 | 3 | Two Shock Fields, two Reinforced Barricades, Salvage Magnet Core |
+| Isolated Boss Arena | (0, 0) | 18 × 12 | Boss Tier | Spawns exclusively in Wave 4; contains all three unique Bosses, Scarab Supports, Wasp Artillery, Barricades, Shock Fields and a Repair Station |
 
-四条连接走廊尺寸分别为：`4 × 3`、`4 × 3`、`3 × 4`、`3 × 4`。
-每个地板格有 12% 概率生成纯视觉地面细节。
+Four connecting corridor dimensions: `4 × 3`, `4 × 3`, `3 × 4`, `3 × 4`.
+Each floor tile has a 12% chance to spawn cosmetic ground detail props.
 
-## 9. 每轮敌人组成
+## 9. Per-Wave Enemy Compositions
+Every standard wave regenerates fixed enemy groups across all four combat rooms:
 
-每次普通轮都会重新生成四个战斗房的固定敌人组：
-
-| 房间 | 固定敌人组 |
+| Room | Fixed Enemy Group Spawns |
 | --- | --- |
-| Scrap Yard | 2 追猎者 + 1 无人机 |
-| Assembly Maze | 2 追猎者 + 1 无人机 + 1 支援者 + 1 炮击蜂 |
-| Cache Room | 2 追猎者 + 1 无人机 + 1 支援者 + 1 炮击蜂 |
-| Reactor Yard | 2 追猎者 + 1 无人机 + 1 支援者 + 2 炮击蜂 + 1 重装壁垒 |
+| Scrap Yard | 2 Ripper Chasers + 1 Hornet Drone |
+| Assembly Maze | 2 Ripper Chasers + 1 Hornet Drone + 1 Scarab Support + 1 Wasp Artillery |
+| Cache Room | 2 Ripper Chasers + 1 Hornet Drone + 1 Scarab Support + 1 Wasp Artillery |
+| Reactor Yard | 2 Ripper Chasers + 1 Hornet Drone + 1 Scarab Support + 2 Wasp Artillery + 1 Centipede Bulwark |
 
-普通轮固定组总计：`20` 个敌人，包括 8 追猎者、4 无人机、3 支援者、
-4 炮击蜂和 1 重装壁垒。
+Total fixed standard wave enemy count: 20 units, including 8 Ripper Chasers, 4 Hornet Drones, 3 Scarab Supports, 4 Wasp Artillery, and 1 Centipede Bulwark.
 
-| 波次 | 组成 | 总敌人数 |
+| Wave | Full Enemy Composition | Total Enemies |
 | --- | --- | ---: |
-| Wave 1 | 普通轮固定组 | 20 |
-| Wave 2 | 固定组 + 2 追猎者 + 1 无人机 | 23 |
-| Wave 3 | 固定组 + 3 追猎者 + 2 无人机 + 1 炮击蜂 | 26 |
-| Wave 4 Boss | Breaker + Siege Titan + Reactor Warden + 1 支援者 + 2 炮击蜂 | 6 |
+| Wave 1 | Base standard fixed group | 20 |
+| Wave 2 | Base fixed group + 2 Ripper Chasers + 1 Hornet Drone | 23 |
+| Wave 3 | Base fixed group + 3 Ripper Chasers + 2 Hornet Drones + 1 Wasp Artillery | 26 |
+| Wave 4 Boss Arena | Breaker Boss + Siege Titan Boss + Reactor Warden Boss + 1 Scarab Support + 2 Wasp Artillery | 6 |
 
-- Wave 1–3 每轮清空四个战斗房的全部敌人后，旧地图立即销毁并生成新的四房地图。
-- 换图时保留当前武器、废料、核心生命、护甲和技能核心升级。
-- 完成 Wave 3 后生成独立的 Boss 竞技场，Wave 4 只在该竞技场进行。
+- After clearing all enemies across the four combat rooms in Waves 1–3, the active map is destroyed and a new four-room map generates immediately.
+- Player-held weapons, scrap resources, core health, armor, and skill core upgrades persist through map transitions.
+- Upon completing Wave 3, the isolated dedicated Boss Arena spawns; Wave 4 combat occurs solely within this arena.
 
-## 10. 波次奖励与模式
-
-| 清理奖励 | 数值 |
+## 10. Wave Completion Rewards & Game Modes
+| Clear Reward | Stat Bonus Value |
 | --- | --- |
-| Wave 1 完成 | 恢复 22 护甲与 15 核心生命；获得第 1 个 Salvage Core；新地图生成 1 把随机武器 |
-| Wave 2 完成 | 恢复 26 护甲与 18 核心生命；获得第 2 个 Salvage Core；新地图生成 1 把随机武器 |
-| Wave 3 完成 | 恢复 30 护甲与 21 核心生命；获得第 3 个 Salvage Core；进入独立 Wave 4 Boss 竞技场 |
+| Wave 1 Complete | Restore 22 armor and 15 core health; unlock first Salvage Core; 1 random weapon spawns on new map |
+| Wave 2 Complete | Restore 26 armor and 18 core health; unlock second Salvage Core; 1 random weapon spawns on new map |
+| Wave 3 Complete | Restore 30 armor and 21 core health; unlock third Salvage Core; unlock isolated Wave 4 Boss Arena |
 
-| 模式 | 区别 |
+| Game Mode | Core Distinction |
 | --- | --- |
-| Story Mode | 标准数值和标准波次 |
-| Challenge Mode | 开局额外生成 Wave 3 压力组：3 追猎者、2 无人机、1 炮击蜂 |
-| Training Mode | 开局额外生成 2 把随机武器，因此出生区域共可获得 5 把武器掉落 |
+| Story Mode | Balanced baseline stats and standard wave spawn rules |
+| Challenge Mode | Additional Wave 3 pressure group spawns at run start: 3 Ripper Chasers, 2 Hornet Drones, 1 Wasp Artillery |
+| Training Mode | 2 extra random weapons spawn at starting zone; total of 5 pickupable weapons available at spawn |
 
-## 11. 操作与交互距离
-
-| 操作 | 数据 |
+## 11. Controls & Interaction Ranges
+| Input Action | Controls & Parameters |
 | --- | --- |
-| 移动 | WASD |
-| 瞄准/射击 | 鼠标瞄准，鼠标左键射击 |
-| 冲刺 | Space |
-| 装备武器 | 距离武器小于 2.25 时按 E |
-| 热量净化 | R |
-| 废料新星 | Q |
-| 磁力护盾 | F |
-| 暂停/继续 | Esc |
-| 通关或失败后返回主菜单 | 结果界面中的 RETURN TO MAIN MENU 按钮 |
+| Player Movement | WASD keys |
+| Aiming / Firing Weapons | Mouse to aim, Left Mouse Button to shoot |
+| Dash Ability | Spacebar |
+| Weapon Pickup & Equip | Press E when within 2.25 unit distance of weapon spawn |
+| Purge Ability | R key |
+| Scrap Nova Ability | Q key |
+| Magnetic Guard Ability | F key |
+| Pause / Resume Gameplay | Esc key |
+| Return to Main Menu Post-Victory / Defeat | RETURN TO MAIN MENU button on results screen |
